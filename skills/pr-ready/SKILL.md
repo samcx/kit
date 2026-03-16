@@ -79,6 +79,7 @@ cc <@SLACK_USER_ID>, ...
 - If a reviewer's Slack ID can't be found, fall back to `<https://github.com/<login>|@<login>>`.
 - If no reviewers were selected, omit the cc line entirely.
 - No bullet points or list markers — just plain lines.
+- Do NOT include a "Sent using Claude" line in the message.
 
 ## Important Behavior
 
