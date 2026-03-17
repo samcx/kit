@@ -41,7 +41,9 @@ Expected format:
 - Do not automate Slack login. If the session is unavailable, not live, or logged out, stop and tell the user.
 - Do not silently switch to another Slack browser session if `pr-ready-codex` is unavailable.
 - Do not assume a listed session name is sufficient. `pr-ready-codex` must also open into a usable Slack app view, not a browser-handoff or redirect page.
+- Treat `about:blank`, `Find your workspace | Slack`, and Slack `workspace-signin` URLs as logged-out or unusable states even if `agent-browser session list` still shows `pr-ready-codex`.
 - If the session is on Slack's desktop-app handoff page but shows `open this link in your browser`, recover it in-place by clicking that browser fallback link once, then rerun the usability checks.
+- If the user needs a visible browser for manual recovery and `--headed` is ignored because the daemon is already running, tell them to run `agent-browser --session pr-ready-codex close || true`, then `pkill -f agent-browser || true`, then relaunch with `agent-browser --session pr-ready-codex --headed open https://app.slack.com/client`.
 - For the Slack posting step, use the existing `pr-ready-codex` session directly.
 
 ## Agent Workflow (Required)
@@ -100,11 +102,15 @@ Steps:
 4. Run a Slack readiness preflight before posting:
     - confirm `pr-ready-codex` appears in `agent-browser session list` when using the shell fallback
     - fetch the page title with `agent-browser --session pr-ready-codex get title`
+    - fetch the current URL with `agent-browser --session pr-ready-codex get url`
     - fetch a snapshot with `agent-browser --session pr-ready-codex snapshot ...`
     - verify the page title is not `Redirecting… | Slack` or similar browser-handoff text
+    - verify the current URL is not `about:blank` and is not a Slack `workspace-signin` URL
+    - verify the page title is not `Find your workspace | Slack`
     - verify the snapshot does not show `open this link in your browser`
     - verify the snapshot shows real Slack app UI such as the workspace shell, channel list, or message pane
     - if the session is on the browser-handoff page and exposes `open this link in your browser`, click that link in the same `pr-ready-codex` session, wait for navigation, and rerun the preflight once
+    - if the session is on `about:blank`, `Find your workspace | Slack`, or a Slack `workspace-signin` URL and `/Users/samcx/.codex/memories/pr-ready-codex-slack-state.json` exists, run `agent-browser --session pr-ready-codex state load /Users/samcx/.codex/memories/pr-ready-codex-slack-state.json`, reopen `https://app.slack.com/client`, wait for navigation, and rerun the preflight once
     - after recovery, prefer the real web-client route (for example `app.slack.com/client/...`) and continue only if the snapshot now shows real Slack app UI
     - if the recovery step is unavailable or the rerun still fails, stop and tell the user that `pr-ready-codex` exists but is not in a usable Slack state
 5. Navigate to the configured Slack channel in that session.
@@ -143,7 +149,7 @@ Steps:
     - a real line break between the PR line and the `cc` line when reviewers were included
     - Slack mention nodes for reviewers when reviewer mentions were intended
     - no raw GitHub URL line unless you intentionally used the emergency fallback
-17. After sending, also verify the thread reply textbox is empty and no lingering unsent draft remains.
+17. After sending, also verify the thread reply textbox is empty and no lingering unsent draft remains, then save the session state to `/Users/samcx/.codex/memories/pr-ready-codex-slack-state.json` with `agent-browser --session pr-ready-codex state save /Users/samcx/.codex/memories/pr-ready-codex-slack-state.json`.
 18. If a partial message is posted accidentally, immediately edit or delete it, clear any remaining draft, and only then report success.
 19. If the daily thread is not found, stop and tell the user. Do not post a top-level channel message.
 
@@ -152,8 +158,10 @@ Steps:
 - Never use `agent-browser type` or `fill` with multiline content in a Slack rich-text composer. Slack may send the first line immediately and leave the rest as a lingering draft.
 - Never set Slack composer content with raw `innerHTML`, `outerHTML`, or whole-node `textContent` replacement. That can bypass Slack's internal editor model and produce malformed posts.
 - If Slack opens an unexpected dialog or popover while composing, such as `Add link`, close it, re-snapshot, and reacquire refs before continuing.
-- Before navigating or drafting, verify the session is in a real Slack app view. A session parked on `Redirecting… | Slack` or a page containing `open this link in your browser` is not usable for `pr-ready`.
+- Before navigating or drafting, verify the session is in a real Slack app view. A session parked on `Redirecting… | Slack`, `about:blank`, `Find your workspace | Slack`, a Slack `workspace-signin` URL, or a page containing `open this link in your browser` is not usable for `pr-ready`.
 - If the session is on Slack's handoff page and exposes `open this link in your browser`, use that in-page browser fallback once before declaring the session unusable.
+- If the session is on `about:blank` or a Slack sign-in page and a saved state exists at `/Users/samcx/.codex/memories/pr-ready-codex-slack-state.json`, load that state and reopen `https://app.slack.com/client` before declaring the session unusable.
+- If the user needs to recover the session manually in a visible window, close the session, kill the daemon, and relaunch with `agent-browser --session pr-ready-codex --headed open https://app.slack.com/client`.
 - Before composing, verify the thread reply textbox is empty. If it is not, clear it first and confirm the thread reply `Send now` button is disabled before continuing.
 - Compose the body in two phases:
   - draft the linked PR number and literal title via DOM/eval
