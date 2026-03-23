@@ -66,7 +66,7 @@ gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].logi
     - get their display name with `gh api users/<login> --jq '.name'`
     - use the GitHub display name as the primary Slack lookup text when it is present
     - if the GitHub display name is empty, fall back to the GitHub login
-    - if Slack shows a candidate matching the intended reviewer, select that exact candidate before considering any fallback
+    - resolve each selected reviewer to a native Slack mention before posting; if any reviewer cannot be resolved to a native Slack mention, stop and report failure
 11. Post to the daily Slack thread using the existing `pr-ready-codex` session (see Slack Posting below).
 12. Copy the PR URL to clipboard with `pbcopy`.
 13. Report outcome: PR ready status, reviewers added, Slack post result.
@@ -79,10 +79,10 @@ Resolve reviewer mentions dynamically instead of using a fixed map.
 - Use the GitHub display name as the primary Slack lookup text. Only use the GitHub login when the display name is missing.
 - In the Slack composer, open the mention picker or type `@<display name>` and keep filtering until the intended reviewer is unique or clearly visible.
 - Match the intended reviewer using the full real name or the Slack option `aria-label`, not just the visible handle.
-- If the intended reviewer is visible in the picker, selecting that exact option is required before any fallback.
+- If the intended reviewer is visible in the picker, selecting that exact option is required.
 - If the picker shows multiple candidates, continue filtering instead of guessing.
 - After selection, verify the draft DOM contains a real Slack mention node for that reviewer, not plain `@text`.
-- Only fall back to `<https://github.com/<login>|@<login>>` after attempting Slack mention resolution and failing to identify the intended reviewer in the picker.
+- If native mention resolution fails for any selected reviewer, stop and report which reviewer could not be resolved. Do not substitute GitHub links or plain `@text`.
 
 ## Slack Posting via Browser Automation
 
@@ -134,7 +134,7 @@ Steps:
     - Insert the PR title as literal text nodes, not by typing the full message line-by-line.
     - If the title contains `@`, `#`, or similar tokens, prevent Slack auto-linking by using literal text nodes or zero-width separators so only intended reviewer mentions resolve.
     - If reviewers were selected, leave the caret at the end of `cc `, then use the GitHub display name as the primary lookup text in Slack mention autocomplete.
-    - If the intended reviewer appears in the picker, select that exact option. Do not fall back while a matching reviewer is visible.
+    - If the intended reviewer appears in the picker, select that exact option.
     - Do not stop at visible `@name` text. Verify Slack shows the intended reviewer, select it explicitly, and confirm the draft DOM contains a real mention node for that reviewer before sending.
 14. Do not use multiline typing into the Slack rich-text composer. Do not build the full draft incrementally with newline typing.
 15. After mentions resolve, verify the draft DOM still shows:
@@ -143,7 +143,7 @@ Steps:
     - unchanged title text with no Slack-created mention nodes inside the title
     - only the intended reviewer mentions as Slack mention nodes
     - no raw GitHub URL line unless you are intentionally using the emergency fallback
-16. If a reviewer mention does not resolve to a unique Slack mention after attempting Slack autocomplete, fall back to `<https://github.com/<login>|@<login>>` for that reviewer and continue.
+16. If any selected reviewer does not resolve to a native Slack mention after attempting Slack autocomplete, stop and report failure. Do not post a degraded `cc` line.
 17. After sending, re-snapshot and verify the posted reply shows:
     - exactly one new reply for the PR
     - a linked `#<number>` node
@@ -184,7 +184,8 @@ Steps:
 - When resolving reviewer mentions, require both:
   - an explicit selection of the intended reviewer from Slack's picker
   - a real mention node in the draft DOM after selection
-- If the intended reviewer is visible in Slack's picker, fallback to a GitHub link is not allowed.
+- Every selected reviewer on the `cc` line must be a native Slack mention node. GitHub profile links and plain `@text` handles are not acceptable substitutes.
+- If the intended reviewer cannot be resolved to a native Slack mention after explicit picker selection and filtering, stop and report failure.
 - Before sending, verify the draft DOM shows:
   - a linked `#<number>` node
   - the first paragraph has the form `:pr: <linked #<number>>: <title>`
@@ -226,6 +227,7 @@ cc @Reviewer One @Reviewer Two
 - Derive `<org>` and `<repo>` from the PR URL returned by `gh pr view`.
 - Treat the PR title as plain text in the composer. For example, `[@api/foo]` must remain literal text, not a Slack mention.
 - If no reviewers were selected, omit the `cc` line entirely.
+- If reviewers were selected, every reviewer token on the `cc` line must be a native Slack mention.
 - Do not use bullets or list markers.
 - Keep the PR number marker in the message as `#<number>:` so dedupe remains reliable.
 - If you must use the emergency fallback, report that the Slack message is degraded instead of claiming the formatting is correct.
@@ -235,6 +237,7 @@ cc @Reviewer One @Reviewer Two
 - Do not rely on terminal `fzf` for agent-driven flows; always ask in chat first.
 - If the user chooses `none`, skip adding reviewers and post without the `cc` line.
 - If the task is a rerun of `pr-ready`, do not silently reuse or silently clear reviewer intent. Ask again.
+- If any selected reviewer cannot be resolved to a native Slack mention, stop and report failure instead of substituting a GitHub link or plain handle.
 - If Slack is unavailable, logged out, or the daily thread is not found, stop and tell the user instead of guessing.
 - If post-send verification fails, leave unrelated messages untouched, keep or clear only the current draft, and report the exact verification failure.
 - If the Slack post fails midway through browser automation, report the exact step that failed and do not claim success.
