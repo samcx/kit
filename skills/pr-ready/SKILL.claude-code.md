@@ -1,14 +1,15 @@
 ---
 name: pr-ready
-description: Mark PRs ready for review, assign GitHub reviewers from a team, and post to a daily Slack thread via MCP tools. Self-configures on first run.
+description: Mark PRs ready for review, assign GitHub reviewers from a team, post to a daily Slack thread, and create a Linear ticket. Self-configures on first run.
 ---
 
-Mark the current PR ready, prompt in chat to choose GitHub reviewers from a team, add reviewers with gh CLI, and post to a daily Slack thread via Slack MCP tools.
+Mark the current PR ready, prompt in chat to choose GitHub reviewers from a team, add reviewers with gh CLI, post to a daily Slack thread via Slack MCP tools, and create a Linear ticket via Linear MCP tools.
 
 ## Prerequisites
 
 - `gh` CLI authenticated with access to your GitHub org
 - Slack MCP tools available (`mcp__claude_ai_Slack__slack_*`)
+- Linear MCP tools available (`mcp__claude_ai_Linear__*`)
 
 ## Configuration
 
@@ -20,6 +21,7 @@ All settings are stored in `~/.claude/pr-ready.json`. On first run, the agent mu
 2. **Auto-detect `github_team`**: Run `gh api "orgs/<github_org>/teams" --paginate --jq '.[].slug'` to list available teams. If there are 4 or fewer, use `AskUserQuestion`. Otherwise, list them and ask the user to type their choice.
 3. **Ask for `channel_id`**: Ask the user for the Slack channel ID where daily PR threads are posted. Hint: they can find it by right-clicking a channel in Slack → "View channel details" → the ID is at the bottom.
 4. **Ask for `thread_match`**: Ask the user what text pattern identifies the daily thread (e.g. `:pr:s for the day`). Suggest they copy a snippet from an existing thread message.
+5. **Ask for `linear_team`**: Ask the user for the Linear team key (e.g. `VA`, `ENG`) where tickets should be created.
 
 Write the config file and continue with the workflow.
 
@@ -29,7 +31,8 @@ Write the config file and continue with the workflow.
   "channel_id": "C08L8AXAE0M",
   "thread_match": ":pr:s for the day",
   "github_org": "vercel",
-  "github_team": "support-platform"
+  "github_team": "support-platform",
+  "linear_team": "VA"
 }
 ```
 
@@ -52,8 +55,9 @@ gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].logi
    2. Search Slack: `mcp__claude_ai_Slack__slack_search_users` with that name
    3. If multiple results, match by name. If no results, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
 9. Post to the daily Slack thread using MCP tools (see Slack Posting below).
-10. Copy the PR URL to clipboard with `pbcopy`.
-11. Report outcome: PR ready status, reviewers added, Slack post result.
+10. **Create a Linear ticket** (see Linear Ticket below).
+11. Copy the PR URL to clipboard with `pbcopy`.
+12. Report outcome: PR ready status, reviewers added, Slack post result, Linear ticket link.
 
 ## Slack Posting via MCP Tools
 
@@ -81,9 +85,26 @@ cc <@SLACK_USER_ID>, ...
 - No bullet points or list markers — just plain lines.
 - Do NOT include a "Sent using Claude" line in the message.
 
+## Linear Ticket
+
+Use the Linear MCP tools to create a ticket after posting to Slack.
+
+Steps:
+
+1. Use `mcp__claude_ai_Linear__save_issue` with:
+   - `title`: The PR title from `gh pr view`
+   - `team`: The `linear_team` value from config
+   - `assignee`: `"me"`
+   - `state`: `"In Review"`
+   - `priority`: `2` (High)
+   - `description`: A brief description of the PR changes, derived from the PR title and context. Include a link to the PR.
+   - `links`: `[{"url": "<PR URL>", "title": "PR #<number>"}]`
+2. Report the created ticket identifier and link in the outcome summary.
+
 ## Important Behavior
 
 - You MUST use Slack MCP tools (`mcp__claude_ai_Slack__slack_*`) for all Slack interactions. NEVER fall back to browser automation, Claude in Chrome (`mcp__claude-in-chrome__*`), or the `slack` skill. If the Slack MCP tools are not available, stop and tell the user.
+- You MUST use Linear MCP tools (`mcp__claude_ai_Linear__*`) for Linear ticket creation. If the Linear MCP tools are not available, skip the Linear step and tell the user.
 - Do not rely on terminal `fzf` for agent-driven flows; always ask in chat first.
 - If user chooses `none`, skip adding reviewers and omit the cc line.
 - If the daily thread is not found, stop and tell the user.
