@@ -13,9 +13,9 @@ Mark the current PR ready, prompt in chat to choose GitHub reviewers from a team
 
 ## Configuration
 
-All settings are stored in `~/.claude/pr-ready.json`. On first run, the agent must check if this file exists and is valid JSON.
+All settings are stored in `~/.claude/pr-ready.json`. On first run, the agent must check if this file exists, is valid JSON, and contains all required keys.
 
-**If the config file is missing or invalid**, run first-run setup:
+**If the config file is missing, invalid, or missing required keys**, run first-run setup:
 
 1. **Auto-detect `github_org`**: Run `gh repo view --json owner --jq '.owner.login'` to get the org from the current repo. Present the detected value and ask the user to confirm or override.
 2. **Auto-detect `github_team`**: Run `gh api "orgs/<github_org>/teams" --paginate --jq '.[].slug'` to list available teams. If there are 4 or fewer, use `AskUserQuestion`. Otherwise, list them and ask the user to type their choice.
@@ -38,7 +38,7 @@ Write the config file and continue with the workflow.
 
 ## Agent Workflow (Required)
 
-1. **Load config** from `~/.claude/pr-ready.json`. If missing, run first-run setup (see above).
+1. **Load config** from `~/.claude/pr-ready.json`. If it is missing, invalid, or missing required keys, run first-run setup (see above).
 2. Resolve current PR context (`gh pr view --json number,title,author,url,isDraft`).
 3. Mark the PR as ready for review (`gh pr ready`). Skip if the PR is already marked ready.
 4. Fetch candidate reviewers from the configured GitHub team:
