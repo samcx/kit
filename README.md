@@ -1,6 +1,6 @@
-# Skills
+# Kit
 
-A collection of reusable skills for AI coding agents.
+A collection of reusable skills and tools for AI coding agents.
 
 ## Available Skills
 
@@ -13,9 +13,9 @@ A collection of reusable skills for AI coding agents.
 Install a skill using the [skills CLI](https://skills.sh):
 
 ```sh
-bunx skills add samcx/skills --skill pr-ready -a claude-code
+bunx skills add samcx/kit --skill pr-ready -a claude-code
 # or
-bunx skills add samcx/skills --skill pr-ready -a codex-cli
+bunx skills add samcx/kit --skill pr-ready -a codex-cli
 ```
 
 ## Agent Support
