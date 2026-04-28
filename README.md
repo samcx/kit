@@ -18,6 +18,21 @@ bunx skills add samcx/kit --skill pr-ready -a claude-code
 bunx skills add samcx/kit --skill pr-ready -a codex-cli
 ```
 
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| [wt-cleanup](commands/wt-cleanup.md) | Remove worktrees whose branches have been merged into the default branch |
+
+Install a command by copying it to `~/.claude/commands/`:
+
+```sh
+cp commands/wt-cleanup.md ~/.claude/commands/
+```
+
+**Prerequisites:**
+- [`wt` (worktrunk)](https://github.com/max-sixty/worktrunk) — git worktree manager
+
 ## Agent Support
 
 ### pr-ready
