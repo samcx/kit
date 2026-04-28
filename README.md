@@ -43,7 +43,6 @@ bunx skills add samcx/kit --skill wt-cleanup
 |-------|--------|
 | Claude Code | ✅ |
 | Codex CLI | ✅ |
-| Other agents | ✖️ |
 
 ### wt-cleanup
 
@@ -51,4 +50,3 @@ bunx skills add samcx/kit --skill wt-cleanup
 |-------|--------|
 | Claude Code | ✅ |
 | Codex CLI | ✅ |
-| Other agents | ✖️ |
