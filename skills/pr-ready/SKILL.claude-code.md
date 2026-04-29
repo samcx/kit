@@ -40,24 +40,25 @@ Write the config file and continue with the workflow.
 
 1. **Load config** from `~/.claude/pr-ready.json`. If it is missing, invalid, or missing required keys, run first-run setup (see above).
 2. Resolve current PR context (`gh pr view --json number,title,author,url,isDraft`).
-3. Mark the PR as ready for review (`gh pr ready`). Skip if the PR is already marked ready.
-4. Fetch candidate reviewers from the configured GitHub team:
+3. **Create a Linear ticket** (see Linear Ticket below). Do this early so the ticket can be linked in the PR description.
+4. **Link the Linear ticket in the PR description**: Append a `Linear: [TICKET-ID](url)` line to the existing PR body using `gh pr edit <number> --body`. Preserve the existing body — only append the Linear link.
+5. Mark the PR as ready for review (`gh pr ready`). Skip if the PR is already marked ready.
+6. Fetch candidate reviewers from the configured GitHub team:
 
 ```sh
 gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].login'
 ```
 
-5. Exclude the PR author from candidates.
-6. Prompt the user to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then use `AskUserQuestion` with multiSelect showing up to 4 options — the user can select "Other" to type a name not shown. If there are 4 or fewer, use `AskUserQuestion` with multiSelect directly.
-7. Add selected reviewers with `gh pr edit <number> --add-reviewer <login>`.
-8. **Resolve Slack user IDs** for each selected reviewer:
-   1. Get their display name: `gh api users/<login> --jq '.name'`
-   2. Search Slack: `mcp__claude_ai_Slack__slack_search_users` with that name
-   3. If multiple results, match by name. If no results, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
-9. Post to the daily Slack thread using MCP tools (see Slack Posting below).
-10. **Create a Linear ticket** (see Linear Ticket below).
-11. Copy the PR URL to clipboard with `pbcopy`.
-12. Report outcome: PR ready status, reviewers added, Slack post result, Linear ticket link.
+7. Exclude the PR author from candidates.
+8. Prompt the user to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then use `AskUserQuestion` with multiSelect showing up to 4 options — the user can select "Other" to type a name not shown. If there are 4 or fewer, use `AskUserQuestion` with multiSelect directly.
+9. Add selected reviewers with `gh pr edit <number> --add-reviewer <login>`.
+10. **Resolve Slack user IDs** for each selected reviewer:
+    1. Get their display name: `gh api users/<login> --jq '.name'`
+    2. Search Slack: `mcp__claude_ai_Slack__slack_search_users` with that name
+    3. If multiple results, match by name. If no results, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
+11. Post to the daily Slack thread using MCP tools (see Slack Posting below).
+12. Copy the PR URL to clipboard with `pbcopy`.
+13. Report outcome: PR ready status, reviewers added, Slack post result, Linear ticket link.
 
 ## Slack Posting via MCP Tools
 
@@ -87,7 +88,7 @@ cc <@SLACK_USER_ID>, ...
 
 ## Linear Ticket
 
-Use the Linear MCP tools to create a ticket after posting to Slack.
+Use the Linear MCP tools to create a ticket early in the workflow (step 3) so it can be linked in the PR description.
 
 Steps:
 
@@ -99,7 +100,7 @@ Steps:
    - `priority`: `2` (High)
    - `description`: A brief description of the PR changes, derived from the PR title and context. Include a link to the PR.
    - `links`: `[{"url": "<PR URL>", "title": "PR #<number>"}]`
-2. Report the created ticket identifier and link in the outcome summary.
+2. Save the returned ticket identifier (e.g. `VA-1234`) and URL for use in step 4 (linking in PR description) and the outcome summary.
 
 ## Important Behavior
 
