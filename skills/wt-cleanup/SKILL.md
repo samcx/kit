@@ -9,24 +9,30 @@ Find and remove stale git worktrees using `wt` (worktrunk).
 
 ## Workflow
 
-1. List worktrees:
+1. Fetch the latest remote refs so recently-merged branches are detected:
+
+```sh
+git fetch origin main
+```
+
+2. List worktrees:
 
 ```sh
 wt list --format=json
 ```
 
-2. From the JSON output, select removable worktrees where all of these are true:
+3. From the JSON output, select removable worktrees where all of these are true:
 
 - `main_state` is `"integrated"` or `"empty"`
 - `is_current` is `false`
 - `is_main` is `false`
 - `kind` is `"worktree"`
 
-3. If no worktrees match, report `No stale worktrees to clean up` and stop.
+4. If no worktrees match, report `No stale worktrees to clean up` and stop.
 
-4. Show the candidates to the user with branch name, age, and last commit message. Ask which to remove, and offer `All` as an option.
+5. Show the candidates to the user with branch name, age, and last commit message. Ask which to remove, and offer `All` as an option.
 
-5. Remove the selected worktrees:
+6. Remove the selected worktrees:
 
 ```sh
 wt remove -f -y <branch> [<branch>...]
@@ -34,4 +40,4 @@ wt remove -f -y <branch> [<branch>...]
 
 Use `-f` because stale worktrees often contain untracked build artifacts. Use `-y` to avoid interactive prompts after the user has already confirmed the selection.
 
-6. Report which worktrees were removed. If any removal fails, show the error.
+7. Report which worktrees were removed. If any removal fails, show the error.
