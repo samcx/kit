@@ -6,7 +6,7 @@ A collection of reusable skills and tools for AI coding agents.
 
 | Skill | Description |
 |-------|-------------|
-| [pr-ready](skills/pr-ready/) | Mark PRs ready for review, assign GitHub reviewers from a team, post to a daily Slack thread, and create a Linear ticket |
+| [pr-ready](skills/pr-ready/) | Create a Linear ticket, link it in the PR description, mark PRs ready for review, assign GitHub reviewers, and post to a daily Slack thread |
 | [wt-cleanup](skills/wt-cleanup/) | Remove worktrees whose branches have been merged into the default branch |
 
 ## Installation
