@@ -3,13 +3,13 @@ name: pr-ready
 description: Mark PRs ready for review, assign GitHub reviewers from a team, post to a daily Slack thread, and create a Linear ticket. Self-configures on first run.
 ---
 
-Mark the current PR ready, prompt in chat to choose GitHub reviewers from a team, add reviewers with gh CLI, post to a daily Slack thread via Slack app tools, and create a Linear ticket via Linear app tools.
+Mark the current PR ready, prompt in chat to choose GitHub reviewers from a team, add reviewers and update the PR body with gh CLI, post to a daily Slack thread via Slack app tools, and create a Linear ticket via Linear app tools.
 
 ## Prerequisites
 
 - `gh` CLI authenticated with access to your GitHub org
 - Slack app tools available (`mcp__codex_apps__slack._slack_*`)
-- Linear app tools available (`mcp__codex_apps__linear_mcp_server._*`)
+- Linear app tools available (`mcp__codex_apps__linear._*`)
 
 ## Configuration
 
@@ -42,7 +42,7 @@ Write the config file and continue with the workflow.
 1. **Load config** from `~/.codex/pr-ready.json`. If it is missing, invalid, or missing required keys, run first-run setup (see above).
 2. Resolve current PR context with `gh pr view --json number,title,author,url,isDraft`.
 3. **Create a Linear ticket** (see Linear Ticket below). Do this early so the ticket can be linked in the PR description.
-4. **Link the Linear ticket in the PR description**: Append a `Linear: [TICKET-ID](url)` line to the existing PR body using `gh pr edit <number> --body`. Preserve the existing body — only append the Linear link.
+4. **Link the Linear ticket in the PR description**: Read the existing PR body with `gh pr view <number> --json body --jq '.body // ""'`, append a `Linear: [TICKET-ID](url)` line to a temporary file, then update the PR with `gh pr edit <number> --body-file <tempfile>`. Preserve the existing body — only append the Linear link.
 5. Mark the PR as ready for review (`gh pr ready`). Skip if the PR is already marked ready.
 6. Fetch candidate reviewers from the configured GitHub team:
 
@@ -93,7 +93,7 @@ Use the Linear app tools to create a ticket early in the workflow (step 3) so it
 
 Steps:
 
-1. Use `mcp__codex_apps__linear_mcp_server._save_issue` with:
+1. Use `mcp__codex_apps__linear._save_issue` with:
    - `title`: The PR title from `gh pr view`
    - `team`: The `linear_team` value from config
    - `assignee`: `"me"` (Linear app tools resolve this to the authenticated user)
@@ -106,7 +106,8 @@ Steps:
 ## Important Behavior
 
 - You MUST use Slack app tools (`mcp__codex_apps__slack._slack_*`) for all Slack interactions. NEVER fall back to browser automation, the browser-based Slack skill, or `agent-browser`. If the Slack app tools are not available, stop and tell the user.
-- You MUST use Linear app tools (`mcp__codex_apps__linear_mcp_server._*`) for Linear ticket creation. If the Linear app tools are not available, skip the Linear step and tell the user.
+- You MUST use Linear app tools (`mcp__codex_apps__linear._*`) for Linear ticket creation. If the Linear app tools are not available, skip the Linear step and tell the user.
+- You MUST use `gh` for GitHub operations in this workflow, including current PR discovery, marking ready, team member lookup, reviewer requests, and PR body updates. Do not switch these steps to the GitHub plugin unless the connector exposes all required operations.
 - Do not rely on terminal `fzf` for agent-driven flows; always ask in chat first.
 - If user chooses `none`, skip adding reviewers and omit the cc line.
 - If the daily thread is not found, stop and tell the user.
