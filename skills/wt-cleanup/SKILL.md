@@ -9,10 +9,20 @@ Find and remove stale git worktrees using `wt` (worktrunk).
 
 ## Workflow
 
-1. Fetch the latest remote refs so recently-merged branches are detected:
+1. Fetch the latest remote refs **and fast-forward the local main branch** so `wt list` correctly detects merged branches. `wt` compares against the local `main` ref, not `origin/main`, so a stale local main causes merged branches to appear as `"diverged"` instead of `"integrated"`.
 
 ```sh
 git fetch origin main
+```
+
+Then fast-forward local main. The approach depends on where you are:
+
+- **If currently on `main`**: `git merge --ff-only origin/main`
+- **If in a different worktree**: run the merge from the main worktree path (first entry in `git worktree list`):
+
+```sh
+main_path=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+git -C "$main_path" merge --ff-only origin/main
 ```
 
 2. List worktrees:
