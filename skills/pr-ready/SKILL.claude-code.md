@@ -39,7 +39,7 @@ Write the config file and continue with the workflow.
 ## Agent Workflow (Required)
 
 1. **Load config** from `~/.claude/pr-ready.json`. If it is missing, invalid, or missing required keys, run first-run setup (see above).
-2. Resolve current PR context (`gh pr view --json number,title,author,url,isDraft`).
+2. Resolve current PR context (`gh pr view --json number,title,author,url,isDraft,additions,deletions`).
 3. **Create a Linear ticket** (see Linear Ticket below). Do this early so the ticket can be linked in the PR description.
 4. **Link the Linear ticket in the PR description**: Append a `Linear: [TICKET-ID](url)` line to the existing PR body using `gh pr edit <number> --body`. Preserve the existing body — only append the Linear link.
 5. Mark the PR as ready for review (`gh pr ready`). Skip if the PR is already marked ready.
@@ -73,12 +73,13 @@ Steps:
 ## Posted Slack Format
 
 ```
-:pr: <https://github.com/<org>/<repo>/pull/<number>|#<number>>: <title>
+:pr: <https://github.com/<org>/<repo>/pull/<number>|#<number>>: <title> +<additions> -<deletions>
 cc <@SLACK_USER_ID>, ...
 ```
 
 - Derive the org and repo from the PR URL returned by `gh pr view`.
 - Make the `#<number>` a Slack mrkdwn link to the GitHub PR URL.
+- Append `+<additions> -<deletions>` to the PR line using values returned by `gh pr view`; if either value is unavailable, omit the stats rather than guessing.
 - Do NOT include an Author line.
 - Use Slack user mention syntax `<@SLACK_USER_ID>` for reviewers so they get pinged.
 - If a reviewer's Slack ID can't be found, fall back to `<https://github.com/<login>|@<login>>`.
