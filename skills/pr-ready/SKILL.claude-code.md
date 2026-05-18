@@ -55,7 +55,7 @@ gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].logi
 ```
 
 7. Exclude the PR author from candidates.
-8. Prompt the user to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then use `AskUserQuestion` with multiSelect showing up to 4 options — the user can select "Other" to type a name not shown. If there are 4 or fewer, use `AskUserQuestion` with multiSelect directly.
+8. Prompt the user exactly once to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then use `AskUserQuestion` with multiSelect showing up to 4 options — the user can select "Other" to type a name not shown. If there are 4 or fewer, use `AskUserQuestion` with multiSelect directly. If the workflow pauses for this choice, do not repeat the full reviewer prompt in a final/status message; say reviewer selection is pending.
 9. Add selected reviewers with `gh pr edit <number> --add-reviewer <login>`.
 10. **Resolve Slack user IDs** for each selected reviewer, in order:
     1. **Check `slack_handles[<login>].id` in the config** — if present, use it directly (no API calls needed). This is the fast path for known teammates.
@@ -116,7 +116,7 @@ Steps:
 - You MUST use Slack MCP tools (`mcp__claude_ai_Slack__slack_*`) for all Slack interactions. NEVER fall back to browser automation, Claude in Chrome (`mcp__claude-in-chrome__*`), or the `slack` skill. If the Slack MCP tools are not available, stop and tell the user.
 - You MUST use Linear MCP tools (`mcp__claude_ai_Linear__*`) for Linear ticket creation. If the Linear MCP tools are not available, skip the Linear step and tell the user.
 - Do not rely on terminal `fzf` for agent-driven flows; always ask in chat first.
+- Do not ask for reviewers more than once in the same `pr-ready` run. Reuse the user's reviewer choice for both GitHub review requests and Slack cc mentions.
 - If user chooses `none`, skip adding reviewers and omit the cc line.
 - If the daily thread is not found, stop and tell the user.
 - If the Slack post fails, show the error and do not claim success.
-
