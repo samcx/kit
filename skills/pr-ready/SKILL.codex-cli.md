@@ -56,7 +56,7 @@ gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].logi
 ```
 
 7. Exclude the PR author from candidates.
-8. Prompt the user to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then ask in chat for the final choice.
+8. Prompt the user exactly once to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then ask in chat for the final choice. If the workflow pauses for this choice, do not repeat the full reviewer prompt in a final/status message; say reviewer selection is pending.
 9. Add selected reviewers with `gh pr edit <number> --add-reviewer <login>`.
 10. **Resolve Slack user IDs** for each selected reviewer, in order:
     1. **Check `slack_handles[<login>].id` in the config** — if present, use it directly (no API calls needed). This is the fast path for known teammates.
@@ -118,7 +118,7 @@ Steps:
 - You MUST use Linear app tools (`mcp__codex_apps__linear._*`) for Linear ticket creation. If the Linear app tools are not available, skip the Linear step and tell the user.
 - You MUST use `gh` for GitHub operations in this workflow, including current PR discovery, marking ready, team member lookup, reviewer requests, and PR body updates. Do not switch these steps to the GitHub plugin unless the connector exposes all required operations.
 - Do not rely on terminal `fzf` for agent-driven flows; always ask in chat first.
+- Do not ask for reviewers more than once in the same `pr-ready` run. Reuse the user's reviewer choice for both GitHub review requests and Slack cc mentions.
 - If user chooses `none`, skip adding reviewers and omit the cc line.
 - If the daily thread is not found, stop and tell the user.
 - If the Slack post fails, show the error and do not claim success.
-
