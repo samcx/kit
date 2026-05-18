@@ -33,9 +33,14 @@ Write the config file and continue with the workflow.
   "github_org": "vercel",
   "github_team": "support-platform",
   "linear_team": "VA",
-  "thread_match": ":pr:s for the day"
+  "thread_match": ":pr:s for the day",
+  "slack_handles": {
+    "<github-login>": { "id": "<slack-user-id>", "name": "<real name>" }
+  }
 }
 ```
+
+`slack_handles` is optional and accumulates over time. Don't prompt for it during first-run setup — the workflow auto-populates it whenever a new reviewer's Slack ID is resolved via search (see step 10).
 
 ## Agent Workflow (Required)
 
@@ -53,10 +58,13 @@ gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].logi
 7. Exclude the PR author from candidates.
 8. Prompt the user to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then ask in chat for the final choice.
 9. Add selected reviewers with `gh pr edit <number> --add-reviewer <login>`.
-10. **Resolve Slack user IDs** for each selected reviewer:
-    1. Get their display name: `gh api users/<login> --jq '.name'`
-    2. Search Slack: `mcp__codex_apps__slack._slack_search_users` with that name
-    3. If multiple results, match by name. If no results, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
+10. **Resolve Slack user IDs** for each selected reviewer, in order:
+    1. **Check `slack_handles[<login>].id` in the config** — if present, use it directly (no API calls needed). This is the fast path for known teammates.
+    2. Get their display name: `gh api users/<login> --jq '.name'`.
+    3. Search Slack: `mcp__codex_apps__slack._slack_search_users` with that name. If multiple results, match by name.
+    4. **Scan the target channel/thread** for prior `<@U.+|handle>` cc patterns from the PR author — daily PR threads often re-cc the same teammates, so a recent cc line can reveal the Slack ID when name search fails.
+    5. If still unresolved, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
+    6. **When steps 2-4 resolve a new mapping, append it to `slack_handles` in `~/.codex/pr-ready.json`** as `"<login>": { "id": "U...", "name": "Real Name" }` so future runs hit step 1.
 11. Post to the daily Slack thread using app tools (see Slack Posting below).
 12. Copy the PR URL to clipboard with `pbcopy`.
 13. Report outcome: PR ready status, reviewers added, Slack post result, Linear ticket link.
@@ -113,3 +121,4 @@ Steps:
 - If user chooses `none`, skip adding reviewers and omit the cc line.
 - If the daily thread is not found, stop and tell the user.
 - If the Slack post fails, show the error and do not claim success.
+
