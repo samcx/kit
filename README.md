@@ -32,6 +32,9 @@ bunx skills add samcx/kit --skill pr-ready -a codex-cli
 bunx skills add samcx/kit --skill wt-cleanup
 ```
 
+In Codex, type `$` and select **Worktree Cleanup** to run it without writing a
+separate prompt.
+
 **Prerequisites:**
 - [`wt` (worktrunk)](https://github.com/max-sixty/worktrunk) — git worktree manager
 

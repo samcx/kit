@@ -1,0 +1,4 @@
+interface:
+  display_name: "Worktree Cleanup"
+  short_description: "Clean merged worktrees and stale local branches"
+  default_prompt: "Use $wt-cleanup to find and remove merged worktrees and stale local branches in the current repository."
