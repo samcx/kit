@@ -42,9 +42,10 @@ Before the first review:
   promise to solve.
 - State the verification required for completion.
 
-Use the user's supplied scope contract verbatim when one exists. Otherwise,
-draft the smallest contract supported by the PR description and diff, and ask
-only about ambiguities that would materially change the outcome.
+Treat the user's supplied contract as authoritative. Preserve its guarantees
+and non-goals; normalize wording or request clarification without broadening
+it. Otherwise, draft the smallest contract supported by the PR description and
+diff, and ask only about ambiguities that would materially change the outcome.
 
 Keep this contract fixed for every iteration. Add, remove, or broaden a
 guarantee only when the user explicitly changes the goal or scope. Do not turn
@@ -108,7 +109,8 @@ For each accepted blocker:
 
 - Reproduce it before editing when practical.
 - Change only what restores the violated guarantee.
-- Add the narrowest regression test that demonstrates the failure.
+- Add or update the narrowest regression test when the behavior is testable;
+  otherwise document the verification performed.
 - Avoid new abstractions, generalized hardening, and opportunistic cleanup.
 - Preserve unrelated user changes and repository instructions.
 - In a stack, attribute the regression to the owning PR or commit. Do not

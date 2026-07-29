@@ -1,4 +1,4 @@
 interface:
   display_name: "Loop Review"
   short_description: "Run scope-bounded adversarial review loops"
-  default_prompt: "Use $loop-review to adversarially review this PR or stack against a fixed scope contract until it is safe for review."
+  default_prompt: "/goal Use $loop-review to review this PR or stack against the scope contract I provide, fix validated in-scope blockers, and continue until it is safe for review."
