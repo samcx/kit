@@ -17,7 +17,7 @@ Install a skill using the [skills CLI](https://skills.sh).
 ### loop-review
 
 ```sh
-bunx skills add samcx/kit --skill loop-review -a codex
+bunx --bun skills add samcx/kit --skill loop-review -a codex
 ```
 
 Start a persistent review loop in Codex with:
