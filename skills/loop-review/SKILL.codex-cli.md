@@ -79,6 +79,13 @@ Classify findings as:
 - Follow-up: a real issue that requires a new guarantee or broader architecture.
 - Pre-existing/out of scope: not introduced or materially worsened here.
 
+Also inspect comments added or modified by this diff for AI slop: comments
+that restate obvious code, narrate implementation or PR history, use generic
+filler, or overexplain straightforward logic. List concrete candidates
+separately as "Comment cleanup" with the smallest deletion or rewrite. Do not
+treat comment cleanup as `fix-first` unless a misleading or incorrect comment
+violates a stated guarantee.
+
 Return "fix-first" only for an in-scope blocker. List adjacent discoveries as
 nonblocking follow-ups. Return "safe for review" when all stated guarantees
 hold.
@@ -119,6 +126,24 @@ For each accepted blocker:
 
 Then inspect the cumulative diff again for interactions among the fixes.
 
+## Review changed comments
+
+Treat comment hygiene as a bounded quality pass:
+
+- Inspect only comments added or modified by the reviewed diff.
+- Prefer deleting comments that merely restate clear code.
+- Keep concise comments that explain non-obvious constraints, invariants, or
+  tradeoffs that the code cannot express.
+- Remove PR-history narration, reviewer-directed prose, generic filler, and
+  speculative explanations.
+- Rewrite misleading comments to match current behavior.
+- Do not expand this pass into unrelated code cleanup or replace one verbose
+  comment with different verbose prose.
+
+When edits are authorized, resolve accepted comment cleanup in the same pass.
+Comment cleanup alone does not require another adversarial `/review`; inspect
+the final diff locally and complete the loop if no functional blocker remains.
+
 ## Continue or stop
 
 After fixes and verification, issue the next paste-ready `/review` command with
@@ -129,7 +154,7 @@ exercise the latest changes.
 Stop with:
 
 - `safe for review` when no validated in-scope blocker remains and required
-  verification passes;
+  verification passes, after accepted changed-comment cleanup is resolved;
 - `blocked` when completion needs an unresolved user decision, unavailable
   authority, or external state change;
 - `fix-first` only while a validated in-scope blocker remains.
@@ -145,5 +170,6 @@ Keep the update compact:
 1. Verdict: `fix-first`, `safe for review`, or `blocked`.
 2. Accepted blockers and the guarantees they violate.
 3. Reclassified or rejected findings and why.
-4. Fixes and verification completed.
-5. The exact next `/review` command, only when another pass is required.
+4. Accepted changed-comment cleanup and the smallest deletion or rewrite.
+5. Fixes and verification completed.
+6. The exact next `/review` command, only when another pass is required.
