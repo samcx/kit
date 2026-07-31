@@ -9,27 +9,41 @@ Use `/goal` to preserve one completion contract across turns and Codex's native
 reviewer to obtain an independent review. Fix only demonstrated violations of
 that contract, verify them, and repeat until no in-scope blocker remains.
 
-## Start the loop
+## Bootstrap the loop through `/goal`
 
-Prefer this Codex invocation:
+`/goal` is a client action. Never claim this skill invoked it.
 
-```text
-/goal Use $loop-review to adversarially review <PR, branch, or stack> against the scope contract below, fix in-scope blockers, and continue until its stated guarantees are safe for review. <scope contract>
-```
+Check whether an active goal exists before starting a review. When the skill is
+activated without an active goal:
 
-Treat the goal objective as the durable outcome, constraints, and definition of
-done. If the user explicitly started or requested a goal and goal tools are
-available, use them to track it. Do not create a goal from implicit skill
-activation alone.
+1. Resolve the exact target, base, head, guarantees, non-goals, allowed fixes,
+   and required verification.
+2. Construct one complete command using this shape:
+
+   ```text
+   /goal Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, allowed fixes, and required verification>. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes until one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, and safe-for-review verdict.
+   ```
+
+3. Keep the command within the 4,000-character `/goal` limit.
+4. Copy the exact command to the clipboard by launching `pbcopy` directly,
+   sending the command through process stdin, and closing stdin. Read it back
+   with `pbpaste` and verify it matches byte-for-byte. Do not use a shell
+   wrapper, pipe, redirection, command substitution, or temporary file for
+   clipboard operations.
+5. Tell the user the command was copied and stop. Do not begin the review.
+
+If clipboard access is unavailable, make the entire response the exact command
+so the user can run `/copy`. When an active goal exists, skip this bootstrap and
+continue the review loop.
+
+Treat the active goal objective as the durable outcome, constraints, and
+definition of done. Use goal tools to track it. Do not create a goal from
+implicit skill activation alone.
 
 If the scope is not yet clear, establish the contract before starting the goal.
 Use `/plan` first when the outcome needs discussion, then put the agreed contract
 in `/goal`. Goal text has a 4,000-character limit; for a longer contract, point
 the goal to a file containing it.
-
-Slash commands are client actions. Never claim to have run `/goal` when the
-current surface cannot invoke it. Use goal tools when an explicit user request
-authorizes them.
 
 ## Select the native review runner
 
@@ -39,26 +53,38 @@ not invoke `codex exec review`, `/review`, this skill, or another reviewer.
 
 Prefer these runners in order:
 
-1. If shell execution is available and `codex exec help review` succeeds, run
-   `codex exec review` from the exact repository worktree. Pass the custom
-   review instructions through stdin with `codex exec review -` or as its
-   prompt argument. This invokes Codex's native review path with a fresh
-   reviewer; do not substitute an ordinary `codex exec` turn or a same-context
-   self-review. Custom instructions conflict with `--base` and `--commit`, so
-   put the exact base and head in the prompt instead of combining those flags.
-   If a launch fails, diagnose prompt quoting, temporary-file, permission, and
-   transient failures and retry when recoverable. Continue to the next runner
-   only after establishing that the native subcommand cannot be invoked in the
-   current environment.
+1. If shell execution is available and `codex exec help review` succeeds, set
+   the process working directory to the exact repository worktree and run:
+
+   ```sh
+   codex --sandbox read-only --ask-for-approval never exec review --ephemeral "<custom review instructions>"
+   ```
+
+   Pass the custom instructions directly as the prompt argument. Do not use
+   stdin, a shell wrapper, pipe, redirection, command substitution, or temporary
+   prompt file. This invokes Codex's native review path with a fresh,
+   non-interactive, read-only reviewer; do not substitute an ordinary
+   `codex exec` turn or a same-context self-review. Custom instructions conflict
+   with `--base` and `--commit`, so put the exact base and head in the prompt
+   instead of combining those flags. If a launch fails, diagnose prompt
+   quoting, permissions, and transient failures and retry when recoverable.
+   Continue to the next runner only after establishing that the native
+   subcommand cannot be invoked in the current environment.
 2. Otherwise, invoke `/review` directly when the current client exposes that
    action to the agent.
 3. Only when neither native runner is callable, emit the exact paste-ready
    `/review` command and wait for the user to run it.
 
 When `codex exec review` is available, run it automatically. Do not make the
-user paste `/review` between iterations. Keep temporary prompt and output files
-outside the reviewed repository, do not use bypass-sandbox options, and wait
-for the review to finish before triaging its output.
+user paste `/review` between iterations. Keep output files outside the reviewed
+repository, do not use bypass-sandbox options, and wait for the review to finish
+before triaging its output.
+
+The parent agent performs authorized fixes using the current session's
+permissions. Keep the target worktree inside the session's writable roots. If
+it is outside them, tell the user to reopen Codex in that worktree instead of
+repeatedly requesting escalation. A skill cannot grant or auto-accept client
+permissions.
 
 ## Freeze the review contract
 

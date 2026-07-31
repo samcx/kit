@@ -20,11 +20,18 @@ Install a skill using the [skills CLI](https://skills.sh).
 bunx --bun skills add samcx/kit --skill loop-review -a codex
 ```
 
-Start a persistent review loop in Codex with:
+Invoke the skill with a PR, branch, or stack:
 
 ```text
-/goal Use $loop-review to adversarially review <PR or stack> against the scope contract below, fix in-scope blockers, and continue until its stated guarantees are safe for review. <scope contract>
+$loop-review <PR, branch, or stack>
 ```
+
+The first turn resolves the review contract, copies the exact `/goal ...`
+command to your clipboard, and stops. Paste and send that command to start the
+persistent loop. Native review passes run read-only with approval requests
+disabled; authorized fixes still use the parent Codex session's permissions, so
+start Codex in the target worktree. Use `/permissions` and select **Approve for
+me** if you want Codex to evaluate eligible parent-session approvals.
 
 ### pr-ready
 
