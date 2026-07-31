@@ -1,12 +1,12 @@
 ---
 name: loop-review
-description: Run scope-bounded adversarial code-review loops for PRs, branches, commit ranges, and cumulative stacks. Use when iterating `/review` findings and fixes until safe for review, using `/goal` to preserve completion criteria, or preventing review loops from expanding scope or becoming endless.
+description: Run scope-bounded adversarial code-review loops for PRs, branches, commit ranges, and cumulative stacks. Use when automating native Codex reviews with `codex exec review` or `/review`, iterating findings and fixes until safe for review, using `/goal` to preserve completion criteria, or preventing review loops from expanding scope or becoming endless.
 ---
 
 # Loop Review
 
-Use `/goal` to preserve one completion contract across turns and `/review` to
-obtain an independent, read-only review. Fix only demonstrated violations of
+Use `/goal` to preserve one completion contract across turns and Codex's native
+reviewer to obtain an independent review. Fix only demonstrated violations of
 that contract, verify them, and repeat until no in-scope blocker remains.
 
 ## Start the loop
@@ -27,15 +27,47 @@ Use `/plan` first when the outcome needs discussion, then put the agreed contrac
 in `/goal`. Goal text has a 4,000-character limit; for a longer contract, point
 the goal to a file containing it.
 
-Slash commands are client actions. Never claim to have run `/goal` or `/review`
-when the current surface cannot invoke them. Instead, emit the exact paste-ready
-command and wait for its result; the active goal preserves continuity.
+Slash commands are client actions. Never claim to have run `/goal` when the
+current surface cannot invoke it. Use goal tools when an explicit user request
+authorizes them.
+
+## Select the native review runner
+
+These runner-selection instructions apply only to the parent agent controlling
+the loop. A native review subprocess performs exactly one review pass: it must
+not invoke `codex exec review`, `/review`, this skill, or another reviewer.
+
+Prefer these runners in order:
+
+1. If shell execution is available and `codex exec help review` succeeds, run
+   `codex exec review` from the exact repository worktree. Pass the custom
+   review instructions through stdin with `codex exec review -` or as its
+   prompt argument. This invokes Codex's native review path with a fresh
+   reviewer; do not substitute an ordinary `codex exec` turn or a same-context
+   self-review. Custom instructions conflict with `--base` and `--commit`, so
+   put the exact base and head in the prompt instead of combining those flags.
+   If a launch fails, diagnose prompt quoting, temporary-file, permission, and
+   transient failures and retry when recoverable. Continue to the next runner
+   only after establishing that the native subcommand cannot be invoked in the
+   current environment.
+2. Otherwise, invoke `/review` directly when the current client exposes that
+   action to the agent.
+3. Only when neither native runner is callable, emit the exact paste-ready
+   `/review` command and wait for the user to run it.
+
+When `codex exec review` is available, run it automatically. Do not make the
+user paste `/review` between iterations. Keep temporary prompt and output files
+outside the reviewed repository, do not use bypass-sandbox options, and wait
+for the review to finish before triaging its output.
 
 ## Freeze the review contract
 
 Before the first review:
 
 - Resolve the exact base and head, including every PR in a cumulative stack.
+- Inspect the working tree before every pass. When authorized fixes are not
+  committed, include all staged, unstaged, and intended untracked changes in
+  the review target; do not assume the unchanged Git head contains them.
 - Inspect the live diff and relevant repository instructions.
 - State each guarantee the change intends to provide.
 - State explicit non-goals, especially nearby architecture the change does not
@@ -53,10 +85,15 @@ adjacent discoveries into blockers by silently appending them to the contract.
 
 ## Request the adversarial review
 
-Use custom `/review` instructions with this structure:
+Build custom review instructions with this structure:
 
 ```text
-/review Adversarially review <exact base through exact head>.
+Adversarially review <exact base through exact head>, including all current
+staged, unstaged, and intended untracked changes in this worktree.
+
+You are the independent review pass, not the loop controller. Do not invoke
+`codex exec review`, `/review`, this skill, or another reviewer. Do not modify
+files.
 
 Strict scope contract:
 1. <guarantee>
@@ -90,6 +127,13 @@ Return "fix-first" only for an in-scope blocker. List adjacent discoveries as
 nonblocking follow-ups. Return "safe for review" when all stated guarantees
 hold.
 ```
+
+Pass that text unchanged to the selected native review runner. Prefix it with
+`/review ` only for the client-command fallback. Native review output may use
+Codex's structured `findings` and `overall_correctness` schema instead of the
+requested verdict words; independently map validated in-scope findings to
+`fix-first` and a correct patch with no validated in-scope findings to
+`safe for review`.
 
 Add precise exclusions for adjacent architecture the contract does not promise.
 Derive them from the current change; never carry one stack's non-goals into
@@ -141,15 +185,18 @@ Treat comment hygiene as a bounded quality pass:
   comment with different verbose prose.
 
 When edits are authorized, resolve accepted comment cleanup in the same pass.
-Comment cleanup alone does not require another adversarial `/review`; inspect
-the final diff locally and complete the loop if no functional blocker remains.
+Like every other edit, comment cleanup must be included in the next cumulative
+native review before completing the loop.
 
 ## Continue or stop
 
-After fixes and verification, issue the next paste-ready `/review` command with
-the same contract. Do not grow the prompt with every past finding; include only
-the fixed contract, exact range, and any concise regression focus needed to
-exercise the latest changes.
+After any fix or comment edit and its verification, update the target
+coordinates and run the selected native reviewer again with the same contract.
+The target must cover the fixed base through the exact head plus all current
+staged, unstaged, and intended untracked changes. Do not grow the prompt with
+every past finding or add new review focus; only those target coordinates may
+change between passes. Emit a paste-ready `/review` command only when neither
+native runner is callable.
 
 Stop with:
 
@@ -172,4 +219,5 @@ Keep the update compact:
 3. Reclassified or rejected findings and why.
 4. Accepted changed-comment cleanup and the smallest deletion or rewrite.
 5. Fixes and verification completed.
-6. The exact next `/review` command, only when another pass is required.
+6. The next native review pass, or the exact fallback `/review` command when
+   another pass is required but no native runner is callable.
