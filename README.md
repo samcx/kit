@@ -31,7 +31,10 @@ command to your clipboard, and stops. Paste and send that command to start the
 persistent loop. Native review passes run read-only with approval requests
 disabled; authorized fixes still use the parent Codex session's permissions, so
 start Codex in the target worktree. Use `/permissions` and select **Approve for
-me** if you want Codex to evaluate eligible parent-session approvals.
+me** if you want Codex to evaluate eligible parent-session approvals. The
+generated goal authorizes staging, committing, and normally pushing validated
+fixes to the existing PR branch; it never authorizes force-pushing or rewriting
+history.
 
 ### pr-ready
 

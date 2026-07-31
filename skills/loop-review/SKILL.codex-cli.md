@@ -21,7 +21,7 @@ activated without an active goal:
 2. Construct one complete command using this shape:
 
    ```text
-   /goal Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, allowed fixes, and required verification>. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes until one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, and safe-for-review verdict.
+   /goal Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes until one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, pushed head, and safe-for-review verdict.
    ```
 
 3. Keep the command within the 4,000-character `/goal` limit.
@@ -179,8 +179,9 @@ code to appease it. Record the disposition once and preserve the contract.
 
 ## Fix the smallest proven blocker
 
-Apply fixes only when the user or goal authorizes edits. Otherwise, report the
-validated blocker and smallest fix without changing the working tree.
+Apply fixes, commit them, and push them only when the user or goal authorizes
+those actions. Otherwise, report the validated blocker and smallest fix without
+changing the working tree or remote branch.
 
 For each accepted blocker:
 
@@ -193,6 +194,11 @@ For each accepted blocker:
 - In a stack, attribute the regression to the owning PR or commit. Do not
   rewrite or force-push stack history without authorization.
 - Run focused tests and type or formatting checks proportional to the change.
+- Stage only the authorized fix files or hunks after inspecting the staged diff;
+  never include unrelated user changes.
+- Commit the verified fixes as one coherent batch for the iteration and push
+  normally to the existing PR head branch. Never force-push or rewrite history.
+- Verify the live PR head matches the pushed commit before the next review pass.
 
 Then inspect the cumulative diff again for interactions among the fixes.
 
