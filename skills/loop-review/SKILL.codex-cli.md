@@ -18,23 +18,24 @@ activated without an active goal:
 
 1. Resolve the exact target, base, head, guarantees, non-goals, allowed fixes,
    and required verification.
-2. Construct one complete command using this shape:
+2. Construct the goal body using this shape. Do not include `/goal` in the
+   clipboard payload:
 
    ```text
-   /goal Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes until one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, pushed head, and safe-for-review verdict.
+   Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes until one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, pushed head, and safe-for-review verdict.
    ```
 
-3. Keep the command within the 4,000-character `/goal` limit.
-4. Copy the exact command to the clipboard by launching `pbcopy` directly,
-   sending the command through process stdin, and closing stdin. Read it back
-   with `pbpaste` and verify it matches byte-for-byte. Do not use a shell
-   wrapper, pipe, redirection, command substitution, or temporary file for
-   clipboard operations.
-5. Tell the user the command was copied and stop. Do not begin the review.
+3. Keep the goal body within the 4,000-character `/goal` limit.
+4. Copy the exact body with `printf '%s' '<safely shell-escaped goal body>' |
+   pbcopy`. Run that pipeline directly; do not wrap it in `sh -c` or `zsh -lc`,
+   and do not use redirection, command substitution, or a temporary file. Read
+   it back with `pbpaste` and verify it matches byte-for-byte.
+5. Tell the user to type or select `/goal`, paste the clipboard contents, and
+   submit. Then stop; do not begin the review.
 
-If clipboard access is unavailable, make the entire response the exact command
-so the user can run `/copy`. When an active goal exists, skip this bootstrap and
-continue the review loop.
+If clipboard access is unavailable, make the entire response the exact goal
+body so the user can run `/copy`, then type `/goal` and paste it. When an active
+goal exists, skip this bootstrap and continue the review loop.
 
 Treat the active goal objective as the durable outcome, constraints, and
 definition of done. Use goal tools to track it. Do not create a goal from

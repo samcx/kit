@@ -26,15 +26,15 @@ Invoke the skill with a PR, branch, or stack:
 $loop-review <PR, branch, or stack>
 ```
 
-The first turn resolves the review contract, copies the exact `/goal ...`
-command to your clipboard, and stops. Paste and send that command to start the
-persistent loop. Native review passes run read-only with approval requests
-disabled; authorized fixes still use the parent Codex session's permissions, so
-start Codex in the target worktree. Use `/permissions` and select **Approve for
-me** if you want Codex to evaluate eligible parent-session approvals. The
-generated goal authorizes staging, committing, and normally pushing validated
-fixes to the existing PR branch; it never authorizes force-pushing or rewriting
-history.
+The first turn resolves the review contract, copies a goal body beginning with
+`Use $loop-review ...`, and stops. Type or select `/goal`, paste the clipboard
+contents, and submit to start the persistent loop. Native review passes run
+read-only with approval requests disabled; authorized fixes still use the
+parent Codex session's permissions, so start Codex in the target worktree. Use
+`/permissions` and select **Approve for me** if you want Codex to evaluate
+eligible parent-session approvals. The generated goal authorizes staging,
+committing, and normally pushing validated fixes to the existing PR branch; it
+never authorizes force-pushing or rewriting history.
 
 ### pr-ready
 
