@@ -7,7 +7,8 @@ description: Run scope-bounded adversarial code-review loops for PRs, branches, 
 
 Use `/goal` to preserve one completion contract across turns and Codex's native
 reviewer to obtain an independent review. Fix only demonstrated violations of
-that contract, verify them, and repeat until no in-scope blocker remains.
+that contract, verify them, and continue automatically only while within the
+scope circuit breaker.
 
 ## Bootstrap the loop through `/goal`
 
@@ -16,13 +17,14 @@ that contract, verify them, and repeat until no in-scope blocker remains.
 Check whether an active goal exists before starting a review. When the skill is
 activated without an active goal:
 
-1. Resolve the exact target, base, head, guarantees, non-goals, allowed fixes,
+1. Resolve the exact target, base, head, guarantees, non-goals, named entry
+   points, temporal boundary, allowed implementation surface, allowed fixes,
    and required verification.
 2. Construct the goal body using this shape. Do not include `/goal` in the
    clipboard payload:
 
    ```text
-   Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes until one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, pushed head, and safe-for-review verdict.
+   Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, named entry points, temporal boundary, allowed implementation surface, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes only while within the scope circuit breaker, stopping when one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, pushed head, and safe-for-review verdict.
    ```
 
 3. Keep the goal body within the 4,000-character `/goal` limit.
@@ -110,6 +112,20 @@ Keep this contract fixed for every iteration. Add, remove, or broaden a
 guarantee only when the user explicitly changes the goal or scope. Do not turn
 adjacent discoveries into blockers by silently appending them to the contract.
 
+## Scope circuit breaker
+
+Before reviewing, freeze the named entry points, temporal boundary, and allowed
+implementation surface.
+
+Do not automatically implement a fix that introduces persistence, a schema or
+migration, public API or SDK changes, a new dependency, or a new route or
+client. Classify it as a scope decision, return `scope-check`, and request
+approval before editing.
+
+If a finding concerns only code introduced by an earlier loop fix, prefer
+reverting or simplifying that fix. Two consecutive findings in loop-added code
+require `scope-check`.
+
 ## Request the adversarial review
 
 Build custom review instructions with this structure:
@@ -126,6 +142,11 @@ Strict scope contract:
 1. <guarantee>
 2. <guarantee>
 
+Frozen implementation boundary:
+- Named entry points: <entry points>
+- Temporal boundary: <base through head and current worktree changes>
+- Allowed implementation surface: <files, packages, and change types>
+
 Explicit non-goals:
 - <non-goal>
 
@@ -140,6 +161,8 @@ For every finding, require:
 
 Classify findings as:
 - In-scope blocker: the diff fails a stated guarantee.
+- Scope decision: a real issue whose smallest fix crosses the frozen
+  implementation boundary.
 - Follow-up: a real issue that requires a new guarantee or broader architecture.
 - Pre-existing/out of scope: not introduced or materially worsened here.
 
@@ -150,7 +173,8 @@ separately as "Comment cleanup" with the smallest deletion or rewrite. Do not
 treat comment cleanup as `fix-first` unless a misleading or incorrect comment
 violates a stated guarantee.
 
-Return "fix-first" only for an in-scope blocker. List adjacent discoveries as
+Return "scope-check" for a scope decision without returning "fix-first". Return
+"fix-first" only for an in-scope blocker. List adjacent discoveries as
 nonblocking follow-ups. Return "safe for review" when all stated guarantees
 hold.
 ```
@@ -158,9 +182,9 @@ hold.
 Pass that text unchanged to the selected native review runner. Prefix it with
 `/review ` only for the client-command fallback. Native review output may use
 Codex's structured `findings` and `overall_correctness` schema instead of the
-requested verdict words; independently map validated in-scope findings to
-`fix-first` and a correct patch with no validated in-scope findings to
-`safe for review`.
+requested verdict words; independently map a validated scope decision to
+`scope-check`, validated in-scope findings to `fix-first`, and a correct patch
+with neither to `safe for review`.
 
 Add precise exclusions for adjacent architecture the contract does not promise.
 Derive them from the current change; never carry one stack's non-goals into
@@ -171,9 +195,11 @@ Review the entire cumulative diff on every pass, not only the latest fix.
 ## Triage findings before editing
 
 Independently validate every finding against the source. Accept it as a blocker
-only when all four required elements are present. Reclassify a real but broader
-issue as a follow-up. Reject speculative, duplicate, pre-existing, or
-scope-expanding findings with a concrete explanation.
+only when all four required elements are present. Reclassify a real issue whose
+smallest fix crosses the frozen implementation boundary as a scope decision and
+stop for approval before editing. Reclassify a real but broader issue that does
+not violate the frozen contract as a follow-up. Reject speculative, duplicate,
+or pre-existing findings with a concrete explanation.
 
 If a reviewer repeats a rejected finding without new evidence, do not change
 code to appease it. Record the disposition once and preserve the contract.
@@ -223,6 +249,8 @@ native review before completing the loop.
 
 ## Continue or stop
 
+Continue automatically only while within the scope circuit breaker.
+
 After any fix or comment edit and its verification, update the target
 coordinates and run the selected native reviewer again with the same contract.
 The target must cover the fixed base through the exact head plus all current
@@ -233,9 +261,12 @@ native runner is callable.
 
 Stop with:
 
-- `safe for review` when no validated in-scope blocker remains and required
-  verification passes, after accepted changed-comment cleanup is resolved;
-- `blocked` when completion needs an unresolved user decision, unavailable
+- `safe for review` when no validated in-scope blocker or scope decision remains
+  and required verification passes, after accepted changed-comment cleanup is
+  resolved;
+- `scope-check` when a validated issue requires approval to cross the frozen
+  implementation boundary or consecutive findings occur in loop-added code;
+- `blocked` when completion needs another unresolved user decision, unavailable
   authority, or external state change;
 - `fix-first` only while a validated in-scope blocker remains.
 
@@ -247,7 +278,7 @@ pass. Mark an active goal complete only after this stopping condition is met.
 
 Keep the update compact:
 
-1. Verdict: `fix-first`, `safe for review`, or `blocked`.
+1. Verdict: `fix-first`, `scope-check`, `safe for review`, or `blocked`.
 2. Accepted blockers and the guarantees they violate.
 3. Reclassified or rejected findings and why.
 4. Accepted changed-comment cleanup and the smallest deletion or rewrite.
