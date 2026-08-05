@@ -1,4 +1,4 @@
 interface:
   display_name: "Loop Review"
   short_description: "Run scope-bounded adversarial review loops"
-  default_prompt: "Use $loop-review to prepare the exact goal body for a scope-bounded review of the PR or stack I provide, copy it to my clipboard, and stop."
+  default_prompt: "Use $loop-review to run a scope-bounded adversarial review of the PR or stack I provide, bootstrapping a /goal only when no active goal exists."
