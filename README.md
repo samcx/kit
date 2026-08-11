@@ -7,7 +7,7 @@ A collection of reusable skills and tools for AI coding agents.
 | Skill | Description |
 |-------|-------------|
 | [loop-review](skills/loop-review/) | Run scope-bounded adversarial review and fix loops until a PR or stack is safe for review |
-| [pr-ready](skills/pr-ready/) | Create a Linear ticket, link it in the PR description, mark PRs ready for review, assign GitHub reviewers, and post to a daily Slack thread |
+| [pr-ready](skills/pr-ready/) | Create a Linear ticket, link it in the PR description, mark PRs ready for review, optionally add GitHub assignees, assign GitHub reviewers, and post to a daily Slack thread |
 | [wt-cleanup](skills/wt-cleanup/) | Remove worktrees whose branches have been merged into the default branch |
 
 ## Installation

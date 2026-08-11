@@ -1,11 +1,13 @@
 ---
 name: pr-ready
-description: Mark one or more related PRs ready for review, assign GitHub reviewers from a team, post to a daily Slack thread, and create Linear tickets. Self-configures on first run.
+description: Mark one or more related PRs ready for review, optionally add explicit GitHub assignees, assign GitHub reviewers from a team, post to a daily Slack thread, and create Linear tickets. Self-configures on first run.
 ---
 
-Mark the current PR ready, prompt in chat to choose GitHub reviewers from a team, add reviewers and update the PR body with gh CLI, post to a daily Slack thread via Slack app tools, and create a Linear ticket via Linear app tools.
+Mark the current PR ready, optionally add explicitly requested GitHub assignees, prompt in chat to choose GitHub reviewers from a team, add reviewers and update the PR body with gh CLI, post to a daily Slack thread via Slack app tools, and create a Linear ticket via Linear app tools.
 
 When the same request publishes multiple related PRs, such as backend and frontend halves of one change, treat them as one batch: use one reviewer selection and send one combined Slack reply listing all unannounced PRs.
+
+GitHub assignees and reviewers are separate. Only add assignees when the user explicitly requests them. Treat "assign this to me" or "assign this to myself" as self-assignment; do not infer an assignee from reviewer selection or prompt for one by default.
 
 ## Prerequisites
 
@@ -42,34 +44,36 @@ Write the config file and continue with the workflow.
 }
 ```
 
-`slack_handles` is optional and accumulates over time. Don't prompt for it during first-run setup — the workflow auto-populates it whenever a new reviewer's Slack ID is resolved via search (see step 10).
+`slack_handles` is optional and accumulates over time. Don't prompt for it during first-run setup — the workflow auto-populates it whenever a new reviewer's Slack ID is resolved via search (see step 12).
 
 ## Agent Workflow (Required)
 
 1. **Load config** from `~/.codex/pr-ready.json`. If it is missing, invalid, or missing required keys, run first-run setup (see above).
-2. Resolve current PR context with `gh pr view --json number,title,author,url,isDraft,additions,deletions`. If the same user request created or names multiple related PRs, resolve each PR and keep them together as one batch for the rest of this workflow.
-3. **Create a Linear ticket for each PR** (see Linear Ticket below). Do this early so each ticket can be linked in its PR description.
-4. **Link each Linear ticket in its PR description**: Read the existing PR body with `gh pr view <number> --json body --jq '.body // ""'`, append a `Linear: [TICKET-ID](url)` line to a temporary file, then update the PR with `gh pr edit <number> --body-file <tempfile>`. Preserve each existing body — only append its Linear link.
-5. Mark each PR as ready for review (`gh pr ready`). Skip any PR already marked ready.
-6. Fetch candidate reviewers from the configured GitHub team:
+2. Resolve current PR context with `gh pr view --json number,title,author,assignees,url,isDraft,additions,deletions`. If the same user request created or names multiple related PRs, resolve each PR and keep them together as one batch for the rest of this workflow.
+3. **Resolve explicitly requested GitHub assignees**. Use a named login as written. For `me` or `myself`, resolve the authenticated login with `gh api user --jq '.login'`. If the user did not request an assignee, skip assignment without prompting. For a batch, apply an unscoped request to every PR; honor any PR-specific scope.
+4. **Create a Linear ticket for each PR** (see Linear Ticket below). Do this early so each ticket can be linked in its PR description.
+5. **Link each Linear ticket in its PR description**: Read the existing PR body with `gh pr view <number> --json body --jq '.body // ""'`, append a `Linear: [TICKET-ID](url)` line to a temporary file, then update the PR with `gh pr edit <number> --body-file <tempfile>`. Preserve each existing body — only append its Linear link.
+6. Mark each PR as ready for review (`gh pr ready`). Skip any PR already marked ready.
+7. Add each explicitly requested assignee to the intended PRs with `gh pr edit <number> --add-assignee <login>`. Skip logins already assigned. A PR author may be assigned to their own PR.
+8. Fetch candidate reviewers from the configured GitHub team:
 
 ```sh
 gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].login'
 ```
 
-7. Exclude every PR author in the batch from candidates.
-8. Prompt the user exactly once to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then ask in chat for the final choice. If the workflow pauses for this choice, do not repeat the full reviewer prompt in a final/status message; say reviewer selection is pending.
-9. Add selected reviewers to each PR with `gh pr edit <number> --add-reviewer <login>`.
-10. **Resolve Slack user IDs** for each selected reviewer, in order:
+9. Exclude every PR author in the batch from reviewer candidates.
+10. Prompt the user exactly once to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then ask in chat for the final choice. If the workflow pauses for this choice, do not repeat the full reviewer prompt in a final/status message; say reviewer selection is pending.
+11. Add selected reviewers to each PR with `gh pr edit <number> --add-reviewer <login>`.
+12. **Resolve Slack user IDs** for each selected reviewer, in order:
     1. **Check `slack_handles[<login>].id` in the config** — if present, use it directly (no API calls needed). This is the fast path for known teammates.
     2. Get their display name: `gh api users/<login> --jq '.name'`.
     3. Search Slack: `mcp__codex_apps__slack._slack_search_users` with that name. If multiple results, match by name.
     4. **Scan the target channel/thread** for prior `<@U.+|handle>` cc patterns from the PR author — daily PR threads often re-cc the same teammates, so a recent cc line can reveal the Slack ID when name search fails.
     5. If still unresolved, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
     6. **When steps 2-4 resolve a new mapping, append it to `slack_handles` in `~/.codex/pr-ready.json`** as `"<login>": { "id": "U...", "name": "Real Name" }` so future runs hit step 1.
-11. Post to the daily Slack thread using app tools (see Slack Posting below). For a batch, post one combined message, not one message per PR.
-12. Copy the PR URL to clipboard with `pbcopy`; for a batch, copy all PR URLs separated by newlines.
-13. Report outcome for each PR: ready status, reviewers added, Slack post result, and Linear ticket link.
+13. Post to the daily Slack thread using app tools (see Slack Posting below). For a batch, post one combined message, not one message per PR.
+14. Copy the PR URL to clipboard with `pbcopy`; for a batch, copy all PR URLs separated by newlines.
+15. Report outcome for each PR: ready status, assignees added or unchanged, reviewers added, Slack post result, and Linear ticket link.
 
 ## Slack Posting via Slack App Tools
 
@@ -127,6 +131,8 @@ Steps:
 - You MUST use Slack app tools (`mcp__codex_apps__slack._slack_*`) for all Slack interactions. NEVER fall back to browser automation, the browser-based Slack skill, or `agent-browser`. If the Slack app tools are not available, stop and tell the user.
 - You MUST use Linear app tools (`mcp__codex_apps__linear._*`) for Linear ticket creation. If the Linear app tools are not available, skip the Linear step and tell the user.
 - You MUST use `gh` for GitHub operations in this workflow, including current PR discovery, marking ready, team member lookup, reviewer requests, and PR body updates. Do not switch these steps to the GitHub plugin unless the connector exposes all required operations.
+- GitHub assignment is opt-in. Do not add or prompt for an assignee unless the user explicitly requests one, and do not treat reviewer selection as an assignment request.
+- Self-assignment is allowed. Excluding PR authors from reviewer candidates does not exclude them from assignees.
 - Do not rely on terminal `fzf` for agent-driven flows; always ask in chat first.
 - Do not ask for reviewers more than once in the same `pr-ready` run. Reuse the user's reviewer choice for both GitHub review requests and Slack cc mentions.
 - Treat related PRs created or prepared in the same request as a batch for Slack. Do not send separate daily-thread replies solely because the change spans repositories.
