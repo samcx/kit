@@ -28,7 +28,8 @@ All settings are stored in `~/.claude/pr-ready.json`. On first run, the agent mu
    - `type`: `thread` (reply in a daily thread) or `channel` (top-level post in the channel)
    - `channel_id`: resolve from the channel name with `mcp__claude_ai_Slack__slack_search_channels`, or ask for the ID (right-click channel → "View channel details" → ID at the bottom)
    - `thread_match` (only for `type: thread`): text that identifies the daily thread (e.g. `:pr:s for the day`). Suggest they copy a snippet from an existing thread message.
-4. **Ask for `linear_team`**: Ask the user for the Linear team key (e.g. `VA`, `ENG`) where tickets should be created.
+   - `linear_team` (optional): Linear team key for tickets announced here, if it differs from the default `linear_team` (e.g. `MONEY`)
+4. **Ask for `linear_team`**: Ask the user for the default Linear team key (e.g. `VA`, `ENG`) where tickets should be created. Destinations can override it with their own `linear_team`.
 
 Write the config file and continue with the workflow.
 
@@ -40,7 +41,7 @@ Write the config file and continue with the workflow.
   "linear_team": "VA",
   "slack_destinations": [
     { "name": "#team-ax daily PR thread", "type": "thread", "channel_id": "C08L8AXAE0M", "thread_match": ":pr:s for the day" },
-    { "name": "#finfra-code-reviews", "type": "channel", "channel_id": "C0B26EZD7DH" }
+    { "name": "#finfra-code-reviews", "type": "channel", "channel_id": "C0B26EZD7DH", "linear_team": "MONEY" }
   ],
   "slack_handles": {
     "<github-login>": { "id": "<slack-user-id>", "name": "<real name>" }
@@ -50,34 +51,34 @@ Write the config file and continue with the workflow.
 
 **Legacy config**: if the file has top-level `channel_id` + `thread_match` instead of `slack_destinations`, treat them as a single `type: thread` destination and rewrite the file into the new shape.
 
-`slack_handles` is optional and accumulates over time. Don't prompt for it during first-run setup — the workflow auto-populates it whenever a new reviewer's Slack ID is resolved via search (see step 12).
+`slack_handles` is optional and accumulates over time. Don't prompt for it during first-run setup — the workflow auto-populates it whenever a new reviewer's Slack ID is resolved via search (see step 13).
 
 ## Agent Workflow (Required)
 
 1. **Load config** from `~/.claude/pr-ready.json`. If it is missing, invalid, or missing required keys, run first-run setup (see above).
 2. Resolve current PR context (`gh pr view --json number,title,author,assignees,url,isDraft,additions,deletions`). If the same user request created or names multiple related PRs, resolve each PR and keep them together as one batch for the rest of this workflow.
 3. **Resolve explicitly requested GitHub assignees**. Use a named login as written. For `me` or `myself`, resolve the authenticated login with `gh api user --jq '.login'`. If the user did not request an assignee, skip assignment without prompting. For a batch, apply an unscoped request to every PR; honor any PR-specific scope.
-4. **Create a Linear ticket for each PR** (see Linear Ticket below). Do this early so each ticket can be linked in its PR description.
-5. **Link each Linear ticket in its PR description**: Append a `Linear: [TICKET-ID](url)` line to each existing PR body using `gh pr edit <number> --body`. Preserve each existing body — only append its Linear link.
-6. Mark each PR as ready for review (`gh pr ready`). Skip any PR already marked ready.
-7. Add each explicitly requested assignee to the intended PRs with `gh pr edit <number> --add-assignee <login>`. Skip logins already assigned. A PR author may be assigned to their own PR.
-8. Fetch candidate reviewers from the configured GitHub team:
+4. Fetch candidate reviewers from the configured GitHub team:
 
 ```sh
 gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].login'
 ```
 
-9. Exclude every PR author in the batch from reviewer candidates.
-10. Prompt the user exactly once to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then use `AskUserQuestion` with multiSelect showing up to 4 options — the user can select "Other" to type a name not shown. If there are 4 or fewer, use `AskUserQuestion` with multiSelect directly. If the workflow pauses for this choice, do not repeat the full reviewer prompt in a final/status message; say reviewer selection is pending.
-11. Add selected reviewers to each PR with `gh pr edit <number> --add-reviewer <login>`.
-12. **Resolve Slack user IDs** for each selected reviewer, in order:
+5. Exclude every PR author in the batch from reviewer candidates.
+6. Prompt the user exactly once to choose 1+ reviewers (or `none`). If there are more than 4 candidates, list ALL candidates in chat first, then use `AskUserQuestion` with multiSelect showing up to 4 options — the user can select "Other" to type a name not shown. If there are 4 or fewer, use `AskUserQuestion` with multiSelect directly. If the workflow pauses for this choice, do not repeat the full reviewer prompt in a final/status message; say reviewer selection is pending.
+7. **Choose the Slack destination**: Use `AskUserQuestion` (single-select) with one option per entry in `slack_destinations`, labeled with its `name`, plus a `Skip Slack` option. Ask this in the same `AskUserQuestion` call as the reviewer prompt in step 6 when possible, so the user answers both at once. If only one destination is configured, still ask (it may be skipped). The choice decides both where to post and which Linear team gets the ticket (see Linear Ticket below), so ask before creating tickets.
+8. **Create a Linear ticket for each PR** in the Linear team for the chosen destination (see Linear Ticket below). Do this early so each ticket can be linked in its PR description.
+9. **Link each Linear ticket in its PR description**: Append a `Linear: [TICKET-ID](url)` line to each existing PR body using `gh pr edit <number> --body`. Preserve each existing body — only append its Linear link.
+10. Mark each PR as ready for review (`gh pr ready`). Skip any PR already marked ready.
+11. Add each explicitly requested assignee to the intended PRs with `gh pr edit <number> --add-assignee <login>`. Skip logins already assigned. A PR author may be assigned to their own PR.
+12. Add selected reviewers to each PR with `gh pr edit <number> --add-reviewer <login>`.
+13. **Resolve Slack user IDs** for each selected reviewer, in order:
     1. **Check `slack_handles[<login>].id` in the config** — if present, use it directly (no API calls needed). This is the fast path for known teammates.
     2. Get their display name: `gh api users/<login> --jq '.name'`.
     3. Search Slack: `mcp__claude_ai_Slack__slack_search_users` with that name. If multiple results, match by name.
     4. **Scan the configured Slack destinations** for prior `<@U.+|handle>` cc patterns from the PR author — daily PR threads often re-cc the same teammates, so a recent cc line can reveal the Slack ID when name search fails.
     5. If still unresolved, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
     6. **When steps 2-4 resolve a new mapping, append it to `slack_handles` in `~/.claude/pr-ready.json`** as `"<login>": { "id": "U...", "name": "Real Name" }` so future runs hit step 1.
-13. **Choose the Slack destination**: Use `AskUserQuestion` (single-select) with one option per entry in `slack_destinations`, labeled with its `name`, plus a `Skip Slack` option. Ask this in the same `AskUserQuestion` call as the reviewer prompt in step 10 when possible, so the user answers both at once. If only one destination is configured, still ask (it may be skipped).
 14. Post to the chosen destination using MCP tools (see Slack Posting below). For a batch, post one combined message, not one message per PR.
 15. Copy the PR URL to clipboard with `pbcopy`; for a batch, copy all PR URLs separated by newlines.
 16. Report outcome for each PR: ready status, assignees added or unchanged, reviewers added, Slack destination and post result, and Linear ticket link.
@@ -124,19 +125,19 @@ cc <@SLACK_USER_ID>, ...
 
 ## Linear Ticket
 
-Use the Linear MCP tools to create a ticket early in the workflow (step 3) so it can be linked in the PR description.
+Use the Linear MCP tools to create a ticket early in the workflow (step 8), after the Slack destination is chosen, so it can be linked in the PR description.
 
 Steps:
 
 1. Use `mcp__claude_ai_Linear__save_issue` with:
    - `title`: The PR title from `gh pr view`
-   - `team`: The `linear_team` value from config
+   - `team`: The chosen destination's `linear_team` if it has one; otherwise the top-level `linear_team` from config (also used when the user picks `Skip Slack`)
    - `assignee`: `"me"` (Linear MCP resolves this to the authenticated user)
    - `state`: `"In Review"`
    - `priority`: `2` (High)
    - `description`: A brief description of the PR changes, derived from the PR title and context. Include a link to the PR.
    - `links`: `[{"url": "<PR URL>", "title": "PR #<number>"}]`
-2. Save the returned ticket identifier (e.g. `VA-1234`) and URL for use in step 4 (linking in PR description) and the outcome summary.
+2. Save the returned ticket identifier (e.g. `VA-1234`) and URL for use in step 9 (linking in PR description) and the outcome summary.
 
 ## Important Behavior
 
