@@ -18,12 +18,15 @@ Install a skill using the [skills CLI](https://skills.sh).
 
 ```sh
 bunx --bun skills add samcx/kit --skill loop-review -a codex
+# or
+bunx --bun skills add samcx/kit --skill loop-review -a claude-code
 ```
 
 Invoke the skill with a PR, branch, or stack:
 
 ```text
-$loop-review <PR, branch, or stack>
+$loop-review <PR, branch, or stack>    # Codex
+/loop-review <PR, branch, or stack>    # Claude Code
 ```
 
 The first turn resolves the review contract, copies a goal body beginning with
@@ -35,6 +38,12 @@ parent Codex session's permissions, so start Codex in the target worktree. Use
 eligible parent-session approvals. The generated goal authorizes staging,
 committing, and normally pushing validated fixes to the existing PR branch; it
 never authorizes force-pushing or rewriting history.
+
+In Claude Code, the first turn likewise copies a goal condition beginning with
+`Use /loop-review ...` and stops; type `/goal `, paste, and submit. Each review
+pass runs in a fresh read-only subagent instead of `codex exec review`, and the
+parent session applies authorized fixes. Run `/goal` in auto mode so goal turns
+proceed without per-tool prompts.
 
 ### pr-ready
 
