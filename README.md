@@ -6,7 +6,7 @@ A collection of reusable skills and tools for AI coding agents.
 
 | Skill | Description |
 |-------|-------------|
-| [loop-review](skills/loop-review/) | Run scope-bounded adversarial review and fix loops until a PR or stack is safe for review |
+| [goal-review](skills/goal-review/) | Run scope-bounded adversarial review and fix loops until a PR or stack is safe for review |
 | [pr-ready](skills/pr-ready/) | Create a Linear ticket, link it in the PR description, mark PRs ready for review, optionally add GitHub assignees, assign GitHub reviewers, and post to a Slack channel or daily Slack thread |
 | [wt-cleanup](skills/wt-cleanup/) | Remove worktrees whose branches have been merged into the default branch |
 
@@ -14,23 +14,23 @@ A collection of reusable skills and tools for AI coding agents.
 
 Install a skill using the [skills CLI](https://skills.sh).
 
-### loop-review
+### goal-review
 
 ```sh
-bunx --bun skills add samcx/kit --skill loop-review -a codex
+bunx --bun skills add samcx/kit --skill goal-review -a codex
 # or
-bunx --bun skills add samcx/kit --skill loop-review -a claude-code
+bunx --bun skills add samcx/kit --skill goal-review -a claude-code
 ```
 
 Invoke the skill with a PR, branch, or stack:
 
 ```text
-$loop-review <PR, branch, or stack>    # Codex
-/loop-review <PR, branch, or stack>    # Claude Code
+$goal-review <PR, branch, or stack>    # Codex
+/goal-review <PR, branch, or stack>    # Claude Code
 ```
 
 The first turn resolves the review contract, copies a goal body beginning with
-`Use $loop-review ...`, and stops. Type or select `/goal`, paste the clipboard
+`Use $goal-review ...`, and stops. Type or select `/goal`, paste the clipboard
 contents, and submit to start the persistent loop. Native review passes run
 read-only with approval requests disabled; authorized fixes still use the
 parent Codex session's permissions, so start Codex in the target worktree. Use
@@ -40,7 +40,7 @@ committing, and normally pushing validated fixes to the existing PR branch; it
 never authorizes force-pushing or rewriting history.
 
 In Claude Code, the first turn likewise copies a goal condition beginning with
-`Use /loop-review ...` and stops; type `/goal `, paste, and submit. Each review
+`Use /goal-review ...` and stops; type `/goal `, paste, and submit. Each review
 pass runs in a fresh read-only subagent instead of `codex exec review`, and the
 parent session applies authorized fixes. Run `/goal` in auto mode so goal turns
 proceed without per-tool prompts.
@@ -74,11 +74,11 @@ separate prompt.
 
 ## Agent Support
 
-### loop-review
+### goal-review
 
 | Agent | Status |
 |-------|--------|
-| Claude Code | — |
+| Claude Code | ✅ |
 | Codex CLI | ✅ |
 
 ### pr-ready

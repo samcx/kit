@@ -1,101 +1,112 @@
 ---
-name: loop-review
-description: Run scope-bounded adversarial code-review loops for PRs, branches, commit ranges, and cumulative stacks. Use when automating native Codex reviews with `codex exec review` or `/review`, iterating findings and fixes until safe for review, using `/goal` to preserve completion criteria, or preventing review loops from expanding scope or becoming endless.
+name: goal-review
+description: Run scope-bounded adversarial code-review loops for PRs, branches, commit ranges, and cumulative stacks. Use when automating independent reviews with a read-only subagent, iterating findings and fixes until safe for review, using `/goal` to preserve completion criteria, or preventing review loops from expanding scope or becoming endless.
 ---
 
-# Loop Review
+# Goal Review
 
-Use `/goal` to preserve one completion contract across turns and Codex's native
-reviewer to obtain an independent review. Fix only demonstrated violations of
-that contract, verify them, and continue automatically only while within the
-scope circuit breaker.
+Use `/goal` to preserve one completion contract across turns and a fresh,
+read-only subagent to obtain an independent review. Fix only demonstrated
+violations of that contract, verify them, and continue automatically only while
+within the scope circuit breaker.
 
 ## Bootstrap the loop through `/goal`
 
-`/goal` is a client action. Never claim this skill invoked it.
+`/goal` is a built-in command that only the user can run. The Skill tool cannot
+invoke it, so never claim this skill set a goal.
 
-Check whether an active goal exists before starting a review. When the skill is
-activated without an active goal:
+Decide which mode applies:
+
+- **Loop mode**: the invoking request already contains a full scope contract
+  (it begins `Use /goal-review to adversarially review` and includes `Scope
+  contract:`), which means `/goal` delivered it. Skip the bootstrap and run the
+  review loop.
+- **Bootstrap mode**: anything else. Do not begin the review.
+
+In bootstrap mode:
 
 1. Resolve the exact target, base, head, guarantees, non-goals, named entry
    points, temporal boundary, allowed implementation surface, allowed fixes,
    and required verification.
-2. Construct the goal body using this shape. Do not include `/goal` in the
+2. Construct the goal condition using this shape. Do not include `/goal` in the
    clipboard payload:
 
    ```text
-   Use $loop-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, named entry points, temporal boundary, allowed implementation surface, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes only while within the scope circuit breaker, stopping when one pass finds no validated blockers. Do not broaden scope. Finish with the final diff, verification, pushed head, and safe-for-review verdict.
+   Use /goal-review to adversarially review <target> at <head> against <base>. Scope contract: <guarantees, non-goals, named entry points, temporal boundary, allowed implementation surface, allowed fixes, and required verification>. Authorize editing, committing, and pushing validated fixes to the existing PR head branch; never force-push or rewrite history. Fix validated in-scope blockers, verify each fix, and continue with fresh independent review passes only while within the scope circuit breaker. Do not broaden scope. The goal is met when the latest iteration report prints `Verdict: safe for review` for the re-resolved live head with required verification passing, or prints `Verdict: scope-check` or `Verdict: blocked` and waits for the user. Finish with the final diff, verification, pushed head, and verdict.
    ```
 
-3. Keep the goal body within the 4,000-character `/goal` limit.
-4. Copy the exact body with `printf '%s' '<safely shell-escaped goal body>' |
-   pbcopy`. Run that pipeline directly; do not wrap it in `sh -c` or `zsh -lc`,
-   and do not use redirection, command substitution, or a temporary file. Read
-   it back with `pbpaste` and verify it matches byte-for-byte.
-5. Tell the user to type or select `/goal`, paste the clipboard contents, and
-   submit. Then stop; do not begin the review.
+3. Keep the condition within the 4,000-character `/goal` limit. For a longer
+   contract, write it to `~/.claude/goal-review/<repo>-<target>.md` (outside
+   the reviewed repository) and have the condition point to that file.
+4. Copy the exact condition with `printf '%s' '<safely shell-escaped
+   condition>' | pbcopy`. Run that pipeline directly; do not wrap it in
+   `sh -c` or `zsh -lc`, and do not use redirection, command substitution, or a
+   temporary file. Read it back with `pbpaste` and verify it matches
+   byte-for-byte.
+5. Tell the user to type `/goal `, paste the clipboard contents, and submit.
+   Recommend auto mode so goal turns run without per-tool prompts. Then stop.
 
-If clipboard access is unavailable, make the entire response the exact goal
-body so the user can run `/copy`, then type `/goal` and paste it. When an active
-goal exists, skip this bootstrap and continue the review loop.
+If clipboard access is unavailable, make the entire response the exact
+condition so the user can copy it, then type `/goal ` and paste it.
 
-Treat the active goal objective as the durable outcome, constraints, and
-definition of done. Use goal tools to track it. Do not create a goal from
-implicit skill activation alone.
+If the user explicitly asks to run without `/goal`, run the loop in the current
+turn instead.
 
-If the scope is not yet clear, establish the contract before starting the goal.
-Use `/plan` first when the outcome needs discussion, then put the agreed contract
-in `/goal`. Goal text has a 4,000-character limit; for a longer contract, point
-the goal to a file containing it.
+If the scope is not yet clear, establish the contract before producing the goal
+condition. Use plan mode first when the outcome needs discussion, then put the
+agreed contract in the condition.
 
-## Select the native review runner
+### Write for the goal evaluator
 
-These runner-selection instructions apply only to the parent agent controlling
-the loop. A native review subprocess performs exactly one review pass: it must
-not invoke `codex exec review`, `/review`, this skill, or another reviewer.
+After each turn, a small model reads the conversation and judges whether the
+goal condition holds. It cannot run commands or read files. Therefore:
+
+- End every iteration with the report below, starting with an exact
+  `Verdict: <verdict>` line.
+- Print the reviewed head SHA and the verification command results in the
+  transcript; the evaluator only trusts what it can read.
+- Do not print `Verdict: safe for review` speculatively or as a plan.
+
+## Run the independent reviewer
+
+The parent agent controls the loop. A reviewer performs exactly one review pass:
+it must not spawn agents, invoke `/goal-review`, `/code-review`, or another
+reviewer, or modify files.
 
 Prefer these runners in order:
 
-1. If shell execution is available and `codex exec help review` succeeds, set
-   the process working directory to the exact repository worktree and run:
+1. **Read-only subagent.** Launch one Agent tool call with `subagent_type:
+   "Plan"`, which cannot edit or write files but can read code and run shell
+   commands such as `git diff`. Use `Explore` if `Plan` is unavailable, or
+   `general-purpose` as a last resort with the no-modification instruction
+   stated in the prompt. Pass the custom review instructions below as the
+   prompt. The subagent starts with a fresh context, so it does not share the
+   parent's reasoning about the fixes.
+2. **Headless CLI.** Only when the Agent tool is unavailable: set the process
+   working directory to the exact repository worktree and run
+   `claude -p --permission-mode plan "<custom review instructions>"`. Pass the
+   instructions directly as the prompt argument. Do not use stdin, a shell
+   wrapper, pipe, redirection, command substitution, or a temporary prompt
+   file.
 
-   ```sh
-   codex --sandbox read-only --ask-for-approval never exec review --ephemeral "<custom review instructions>"
-   ```
+Do not substitute a same-context self-review or the built-in `/code-review`
+skill; neither enforces the frozen contract or returns `scope-check`.
 
-   Pass the custom instructions directly as the prompt argument. Do not use
-   stdin, a shell wrapper, pipe, redirection, command substitution, or temporary
-   prompt file. This invokes Codex's native review path with a fresh,
-   non-interactive, read-only reviewer; do not substitute an ordinary
-   `codex exec` turn or a same-context self-review. Custom instructions conflict
-   with `--base` and `--commit`, so put the exact base and head in the prompt
-   instead of combining those flags. If a launch fails, diagnose prompt
-   quoting, permissions, and transient failures and retry when recoverable.
-   Continue to the next runner only after establishing that the native
-   subcommand cannot be invoked in the current environment.
-2. Otherwise, invoke `/review` directly when the current client exposes that
-   action to the agent.
-3. Only when neither native runner is callable, emit the exact paste-ready
-   `/review` command and wait for the user to run it.
+Run exactly one reviewer per pass. Wait for it to finish before triaging its
+output; do not relaunch it because it is slow. If it fails, diagnose and retry
+once when recoverable.
 
-When `codex exec review` is available, run it automatically. Do not make the
-user paste `/review` between iterations. Keep output files outside the reviewed
-repository, do not use bypass-sandbox options, and wait for the review to finish
-before triaging its output.
+After each pass, confirm `git status --porcelain` matches its pre-review state.
+If the reviewer changed the worktree, discard only those changes, record the
+violation, and rerun the pass.
 
-Run exactly one reviewer process per pass. Retain its session and poll it until
-it exits; do not relaunch it because output is quiet or a poll times out.
+The reviewer does not run verification that writes to the worktree, such as
+builds or test runs that emit artifacts. The parent runs required verification
+in its own session and uses that result.
 
-If a verification command cannot run only because the reviewer's read-only
-sandbox blocks required writes, record it as unavailable rather than a code
-finding. Re-run the required verification in the parent's authorized
-environment and use that result.
-
-The parent agent performs authorized fixes using the current session's
-permissions. Keep the target worktree inside the session's writable roots. If
-it is outside them, tell the user to reopen Codex in that worktree instead of
-repeatedly requesting escalation. A skill cannot grant or auto-accept client
-permissions.
+The parent performs authorized fixes using the current session's permissions. A
+skill cannot grant or auto-accept permissions; if the target worktree needs
+access the session lacks, tell the user rather than repeatedly requesting it.
 
 ## Freeze the review contract
 
@@ -105,7 +116,8 @@ Before the first review:
 - Inspect the working tree before every pass. When authorized fixes are not
   committed, include all staged, unstaged, and intended untracked changes in
   the review target; do not assume the unchanged Git head contains them.
-- Inspect the live diff and relevant repository instructions.
+- Inspect the live diff and relevant repository instructions, including
+  `CLAUDE.md` and `AGENTS.md`.
 - State each guarantee the change intends to provide.
 - State explicit non-goals, especially nearby architecture the change does not
   promise to solve.
@@ -143,12 +155,12 @@ and does not waive later `scope-check` requirements.
 Build custom review instructions with this structure:
 
 ```text
-Adversarially review <exact base through exact head>, including all current
-staged, unstaged, and intended untracked changes in this worktree.
+Adversarially review <exact base through exact head> in <absolute worktree
+path>, including all current staged, unstaged, and intended untracked changes.
 
-You are the independent review pass, not the loop controller. Do not invoke
-`codex exec review`, `/review`, this skill, or another reviewer. Do not modify
-files.
+You are the independent review pass, not the loop controller. Do not spawn
+agents or invoke /goal-review, /code-review, or another reviewer. Do not modify
+files, and do not run builds or tests that write to the worktree.
 
 Strict scope contract:
 1. <guarantee>
@@ -182,21 +194,17 @@ Also inspect comments added or modified by this diff for low-value generated
 prose: comments that restate obvious code, narrate implementation or PR history,
 use generic filler, or overexplain straightforward logic. List concrete
 candidates separately as "Comment cleanup" with the smallest deletion or
-rewrite. Do not treat comment cleanup as `fix-first` unless a misleading or
+rewrite. Do not treat comment cleanup as "fix-first" unless a misleading or
 incorrect comment violates a stated guarantee.
 
-Return "scope-check" for a scope decision without returning "fix-first". Return
-"fix-first" only for an in-scope blocker. List adjacent discoveries as
-nonblocking follow-ups. Return "safe for review" when all stated guarantees
-hold.
+End with exactly one verdict line. Return "scope-check" for a scope decision
+without returning "fix-first". Return "fix-first" only for an in-scope blocker.
+List adjacent discoveries as nonblocking follow-ups. Return "safe for review"
+when all stated guarantees hold.
 ```
 
-Pass that text unchanged to the selected native review runner. Prefix it with
-`/review ` only for the client-command fallback. Native review output may use
-Codex's structured `findings` and `overall_correctness` schema instead of the
-requested verdict words; independently map a validated scope decision to
-`scope-check`, validated in-scope findings to `fix-first`, and a correct patch
-with neither to `safe for review`.
+Pass that text unchanged to the selected runner. Independently map the
+reviewer's validated findings to a verdict rather than copying its verdict line.
 
 Add precise exclusions for adjacent architecture the contract does not promise.
 Derive them from the current change; never carry one stack's non-goals into
@@ -257,19 +265,18 @@ Treat comment hygiene as a bounded quality pass:
 
 When edits are authorized, resolve accepted comment cleanup in the same pass.
 Like every other edit, comment cleanup must be included in the next cumulative
-native review before completing the loop.
+review before completing the loop.
 
 ## Continue or stop
 
 Continue automatically only while within the scope circuit breaker.
 
 After any fix or comment edit and its verification, update the target
-coordinates and run the selected native reviewer again with the same contract.
-The target must cover the fixed base through the exact head plus all current
-staged, unstaged, and intended untracked changes. Do not grow the prompt with
-every past finding or add new review focus; only those target coordinates may
-change between passes. Emit a paste-ready `/review` command only when neither
-native runner is callable.
+coordinates and run a fresh reviewer again with the same contract. The target
+must cover the fixed base through the exact head plus all current staged,
+unstaged, and intended untracked changes. Do not grow the prompt with every past
+finding or add new review focus; only those target coordinates may change
+between passes.
 
 Immediately before returning `safe for review` for a live PR, re-resolve the
 PR head. If it differs from the head covered by the final pass, the verdict is
@@ -288,16 +295,16 @@ Stop with:
 
 Follow-ups do not prevent `safe for review`. A review that returns `safe for
 review` completes the loop; it is not a reason to start another adversarial
-pass. Mark an active goal complete only after this stopping condition is met.
+pass.
 
 ## Report each iteration
 
 Keep the update compact:
 
-1. Verdict: `fix-first`, `scope-check`, `safe for review`, or `blocked`.
+1. `Verdict: <fix-first | scope-check | safe for review | blocked>` on its own
+   line, followed by the reviewed head SHA.
 2. Accepted blockers and the guarantees they violate.
 3. Reclassified or rejected findings and why.
 4. Accepted changed-comment cleanup and the smallest deletion or rewrite.
-5. Fixes and verification completed.
-6. The next native review pass, or the exact fallback `/review` command when
-   another pass is required but no native runner is callable.
+5. Fixes and verification completed, with command results.
+6. The next review pass, when another pass is required.
