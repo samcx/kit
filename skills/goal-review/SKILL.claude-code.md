@@ -90,7 +90,9 @@ Prefer these runners in order:
    file.
 
 Do not substitute a same-context self-review or the built-in `/code-review`
-skill; neither enforces the frozen contract or returns `scope-check`.
+skill for the reviewer; neither enforces the frozen contract or returns
+`scope-check`. The parent's one-time `/code-review` pre-pass below is separate
+and does not replace any reviewer pass.
 
 Run exactly one reviewer per pass. Wait for it to finish before triaging its
 output; do not relaunch it because it is slow. If it fails, diagnose and retry
@@ -149,6 +151,22 @@ require `scope-check`.
 Count consecutive findings across successive review passes, not within one
 reviewer response. User approval applies only to the named boundary expansion
 and does not waive later `scope-check` requirements.
+
+## Run one broad `/code-review` pre-pass
+
+After freezing the contract and before the first adversarial pass, the parent
+runs `/code-review` once, without `--fix` or `--comment`, on the same base
+through head plus current staged, unstaged, and intended untracked changes. Run
+it in the parent session, never from the reviewer subagent.
+
+Triage every pre-pass finding against the frozen contract exactly as in "Triage
+findings before editing": fix only validated in-scope blockers, and reclassify
+the rest as scope decisions, follow-ups, or pre-existing. Never add or broaden a
+guarantee because of a pre-pass finding. Any fix it leads to is covered by the
+first adversarial pass like every other edit.
+
+Run the pre-pass only once per goal; later passes use only the independent
+reviewer. Skip it when the user's contract says to.
 
 ## Request the adversarial review
 
@@ -303,7 +321,8 @@ Keep the update compact:
 
 1. `Verdict: <fix-first | scope-check | safe for review | blocked>` on its own
    line, followed by the reviewed head SHA.
-2. Accepted blockers and the guarantees they violate.
+2. Accepted blockers and the guarantees they violate. In the first iteration,
+   include the `/code-review` pre-pass findings and their dispositions.
 3. Reclassified or rejected findings and why.
 4. Accepted changed-comment cleanup and the smallest deletion or rewrite.
 5. Fixes and verification completed, with command results.
