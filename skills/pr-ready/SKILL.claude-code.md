@@ -1,11 +1,11 @@
 ---
 name: pr-ready
-description: Mark one or more related PRs ready for review, optionally add explicit GitHub assignees, assign GitHub reviewers from a team, post to a Slack channel or daily Slack thread (user picks), and create Linear tickets. Self-configures on first run.
+description: Mark one or more related PRs ready for review, optionally add explicit GitHub assignees, assign GitHub reviewers from a team, draft a Slack announcement in a channel or daily thread (user picks), and create Linear tickets. Self-configures on first run.
 ---
 
-Mark the current PR ready, optionally add explicitly requested GitHub assignees, prompt in chat to choose GitHub reviewers from a team, add reviewers with gh CLI, prompt in chat to choose a Slack destination (a channel or a daily thread), post there via Slack MCP tools, and create a Linear ticket via Linear MCP tools.
+Mark the current PR ready, optionally add explicitly requested GitHub assignees, prompt in chat to choose GitHub reviewers from a team, add reviewers with gh CLI, prompt in chat to choose a Slack destination (a channel or a daily thread), draft the announcement there via Slack MCP tools for the user to send, and create a Linear ticket via Linear MCP tools.
 
-When the same request publishes multiple related PRs, such as backend and frontend halves of one change, treat them as one batch: use one reviewer selection and send one combined Slack reply listing all unannounced PRs.
+When the same request publishes multiple related PRs, such as backend and frontend halves of one change, treat them as one batch: use one reviewer selection and draft one combined Slack message listing all unannounced PRs.
 
 GitHub assignees and reviewers are separate. Only add assignees when the user explicitly requests them. Treat "assign this to me" or "assign this to myself" as self-assignment; do not infer an assignee from reviewer selection or prompt for one by default.
 
@@ -79,26 +79,28 @@ gh api "orgs/<github_org>/teams/<github_team>/members" --paginate --jq '.[].logi
     4. **Scan the configured Slack destinations** for prior `<@U.+|handle>` cc patterns from the PR author — daily PR threads often re-cc the same teammates, so a recent cc line can reveal the Slack ID when name search fails.
     5. If still unresolved, fall back to `<https://github.com/<login>|@<login>>` in the Slack message.
     6. **When steps 2-4 resolve a new mapping, append it to `slack_handles` in `~/.claude/pr-ready.json`** as `"<login>": { "id": "U...", "name": "Real Name" }` so future runs hit step 1.
-14. Post to the chosen destination using MCP tools (see Slack Posting below). For a batch, post one combined message, not one message per PR.
+14. Draft the announcement in the chosen destination using MCP tools (see Slack Drafting below). For a batch, draft one combined message, not one message per PR.
 15. Copy the PR URL to clipboard with `pbcopy`; for a batch, copy all PR URLs separated by newlines.
-16. Report outcome for each PR: ready status, assignees added or unchanged, reviewers added, Slack destination and post result, and Linear ticket link.
+16. Report outcome for each PR: ready status, assignees added or unchanged, reviewers added, Slack destination and draft result (include the returned `channel_link` and remind the user to send the draft), and Linear ticket link.
 
-## Slack Posting via MCP Tools
+## Slack Drafting via MCP Tools
 
-Use the Slack MCP tools directly instead of calling a deployed endpoint. Follow the steps for the chosen destination's `type`.
+Use the Slack MCP tools to create a draft; never send the message yourself. Messages sent through the API get Slack's app attribution footer and an untrusted-link warning, while a draft the user sends from their own Slack client posts as a normal message. Follow the steps for the chosen destination's `type`.
 
 ### `type: thread` (e.g. #team-ax daily PR thread)
 
 1. **Find the daily thread**: Use `mcp__claude_ai_Slack__slack_read_channel` with the destination's `channel_id` and `limit: 20`. Find the message whose text contains the destination's `thread_match` pattern. Extract its `ts` (or `thread_ts`) as the thread timestamp.
-2. **Check for duplicates**: Use `mcp__claude_ai_Slack__slack_read_thread` with the channel ID and the thread timestamp. Check each PR URL or `<repo>/pull/<number>` fragment in the batch. Omit any PR already announced; if all are already present, skip posting and report that the batch was deduped.
-3. **Post one message**: Use `mcp__claude_ai_Slack__slack_send_message` with `channel_id`, `thread_ts`, and one formatted message containing all remaining unannounced PRs.
+2. **Check for duplicates**: Use `mcp__claude_ai_Slack__slack_read_thread` with the channel ID and the thread timestamp. Check each PR URL or `<repo>/pull/<number>` fragment in the batch. Omit any PR already announced; if all are already present, skip drafting and report that the batch was deduped.
+3. **Draft one message**: Use `mcp__claude_ai_Slack__slack_send_message_draft` with `channel_id`, `thread_ts`, and one formatted message containing all remaining unannounced PRs. Keep the returned `channel_link` for the outcome report.
 
 ### `type: channel` (e.g. #finfra-code-reviews)
 
-1. **Check for duplicates**: Use `mcp__claude_ai_Slack__slack_read_channel` with the destination's `channel_id` and `limit: 50`. Omit any PR in the batch whose URL or `<repo>/pull/<number>` fragment already appears in a recent message; if all are present, skip posting and report that the batch was deduped.
-2. **Post one top-level message**: Use `mcp__claude_ai_Slack__slack_send_message` with `channel_id` only (no `thread_ts`), using the same message format below.
+1. **Check for duplicates**: Use `mcp__claude_ai_Slack__slack_read_channel` with the destination's `channel_id` and `limit: 50`. Omit any PR in the batch whose URL or `<repo>/pull/<number>` fragment already appears in a recent message; if all are present, skip drafting and report that the batch was deduped.
+2. **Draft one top-level message**: Use `mcp__claude_ai_Slack__slack_send_message_draft` with `channel_id` only (no `thread_ts`), using the same message format below. Keep the returned `channel_link` for the outcome report.
 
-## Posted Slack Format
+If draft creation fails with `attached_draft_exists`, stop and tell the user to send or delete their existing draft in that channel or thread. Do not fall back to sending the message directly.
+
+## Slack Message Format
 
 ```
 :pr: <https://github.com/<org>/<repo>/pull/<number>|#<number>>: <title> +<additions> -<deletions>
@@ -121,7 +123,6 @@ cc <@SLACK_USER_ID>, ...
 - If a reviewer's Slack ID can't be found, fall back to `<https://github.com/<login>|@<login>>`.
 - If no reviewers were selected, omit the cc line entirely.
 - No bullet points or list markers — just plain lines.
-- Do NOT include a "Sent using Claude" line in the message.
 
 ## Linear Ticket
 
@@ -142,6 +143,7 @@ Steps:
 ## Important Behavior
 
 - You MUST use Slack MCP tools (`mcp__claude_ai_Slack__slack_*`) for all Slack interactions. NEVER fall back to browser automation, Claude in Chrome (`mcp__claude-in-chrome__*`), or the `slack` skill. If the Slack MCP tools are not available, stop and tell the user.
+- NEVER send or schedule the Slack announcement yourself. Always create a draft so the user sends it from their own Slack client.
 - You MUST use Linear MCP tools (`mcp__claude_ai_Linear__*`) for Linear ticket creation. If the Linear MCP tools are not available, skip the Linear step and tell the user.
 - GitHub assignment is opt-in. Do not add or prompt for an assignee unless the user explicitly requests one, and do not treat reviewer selection as an assignment request.
 - Self-assignment is allowed. Excluding PR authors from reviewer candidates does not exclude them from assignees.
@@ -149,6 +151,6 @@ Steps:
 - Do not ask for reviewers more than once in the same `pr-ready` run. Reuse the user's reviewer choice for both GitHub review requests and Slack cc mentions.
 - Treat related PRs created or prepared in the same request as a batch for Slack. Do not send separate Slack messages solely because the change spans repositories.
 - If user chooses `none`, skip adding reviewers and omit the cc line.
-- If the user picks `Skip Slack`, skip posting and say so in the outcome.
+- If the user picks `Skip Slack`, skip drafting and say so in the outcome.
 - If the daily thread is not found (for a `thread` destination), stop and tell the user.
-- If the Slack post fails, show the error and do not claim success.
+- If creating the Slack draft fails, show the error and do not claim success.
