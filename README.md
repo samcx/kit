@@ -55,10 +55,17 @@ bunx skills add samcx/kit --skill pr-ready -a codex-cli
 bunx skills add samcx/kit --skill pr-ready -a cursor
 ```
 
+For fx, copy the fx variant into its global skills directory:
+
+```sh
+mkdir -p ~/.fx/skills/pr-ready
+curl -fsSL https://raw.githubusercontent.com/samcx/kit/main/skills/pr-ready/SKILL.fx.md -o ~/.fx/skills/pr-ready/SKILL.md
+```
+
 **Prerequisites:**
 - [`gh` CLI](https://cli.github.com/) — authenticated with access to your GitHub org
-- [Slack app](https://modelcontextprotocol.io/integrations/slack) — configured for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), or [Cursor](https://cursor.com)
-- [Linear app](https://modelcontextprotocol.io/integrations/linear) — configured for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), or [Cursor](https://cursor.com)
+- [Slack app](https://modelcontextprotocol.io/integrations/slack) — configured for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), [Cursor](https://cursor.com), or fx
+- [Linear app](https://modelcontextprotocol.io/integrations/linear) — configured for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), [Cursor](https://cursor.com), or fx
 
 ### wt-cleanup
 
@@ -88,6 +95,7 @@ separate prompt.
 | Claude Code | ✅ |
 | Codex CLI | ✅ |
 | Cursor | ✅ |
+| fx | ✅ |
 
 ### wt-cleanup
 
